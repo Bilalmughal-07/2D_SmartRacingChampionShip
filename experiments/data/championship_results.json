@@ -1,0 +1,226 @@
+{
+  "races": [
+    {
+      "track": "circuit_01",
+      "results": [
+        {
+          "race_id": "circuit_01",
+          "racer_id": 1,
+          "finish_position": 1,
+          "finish_time": 44.48333333333209,
+          "fastest_lap": 21.30000000000007,
+          "bonus_points": 0,
+          "points_awarded": 25,
+          "dnf": false
+        },
+        {
+          "race_id": "circuit_01",
+          "racer_id": 3,
+          "finish_position": 2,
+          "finish_time": 49.24999999999849,
+          "fastest_lap": 21.50000000000006,
+          "bonus_points": 0,
+          "points_awarded": 18,
+          "dnf": false
+        },
+        {
+          "race_id": "circuit_01",
+          "racer_id": 4,
+          "finish_position": 3,
+          "finish_time": 49.24999999999849,
+          "fastest_lap": 21.50000000000006,
+          "bonus_points": 0,
+          "points_awarded": 15,
+          "dnf": false
+        },
+        {
+          "race_id": "circuit_01",
+          "racer_id": 2,
+          "finish_position": 4,
+          "finish_time": 53.24999999999826,
+          "fastest_lap": 25.499999999999833,
+          "bonus_points": 0,
+          "points_awarded": 12,
+          "dnf": false
+        }
+      ],
+      "events": [
+        "t=12.0: road_blockage target=3",
+        "t=24.0: road_reopen target=3",
+        "t=25.0: shortcut_toggle target=10",
+        "t=38.0: oil_spill target=5",
+        "t=45.0: shortcut_toggle target=10"
+      ]
+    },
+    {
+      "track": "circuit_02",
+      "results": [
+        {
+          "race_id": "circuit_02",
+          "racer_id": 1,
+          "finish_position": 1,
+          "finish_time": 67.89999999999743,
+          "fastest_lap": 32.59999999999943,
+          "bonus_points": 0,
+          "points_awarded": 25,
+          "dnf": false
+        },
+        {
+          "race_id": "circuit_02",
+          "racer_id": 3,
+          "finish_position": 2,
+          "finish_time": 75.24999999999702,
+          "fastest_lap": 36.1666666666659,
+          "bonus_points": 0,
+          "points_awarded": 18,
+          "dnf": false
+        },
+        {
+          "race_id": "circuit_02",
+          "racer_id": 4,
+          "finish_position": 3,
+          "finish_time": 75.24999999999702,
+          "fastest_lap": 36.1666666666659,
+          "bonus_points": 0,
+          "points_awarded": 15,
+          "dnf": false
+        },
+        {
+          "race_id": "circuit_02",
+          "racer_id": 2,
+          "finish_position": 4,
+          "finish_time": 81.24999999999667,
+          "fastest_lap": 38.99999999999907,
+          "bonus_points": 0,
+          "points_awarded": 12,
+          "dnf": false
+        }
+      ],
+      "events": [
+        "t=12.0: road_blockage target=3",
+        "t=24.0: road_reopen target=3",
+        "t=25.0: shortcut_toggle target=10",
+        "t=38.0: oil_spill target=5",
+        "t=45.0: shortcut_toggle target=10",
+        "t=55.0: speed_restriction target=7",
+        "t=58.0: effect_expire target=5",
+        "t=70.0: effect_expire target=7"
+      ]
+    },
+    {
+      "track": "circuit_03",
+      "results": [
+        {
+          "race_id": "circuit_03",
+          "racer_id": 1,
+          "finish_position": 1,
+          "finish_time": 61.46666666666446,
+          "fastest_lap": 28.333333333333005,
+          "bonus_points": 0,
+          "points_awarded": 25,
+          "dnf": false
+        },
+        {
+          "race_id": "circuit_03",
+          "racer_id": 3,
+          "finish_position": 2,
+          "finish_time": 68.43333333333074,
+          "fastest_lap": 29.999999999999577,
+          "bonus_points": 0,
+          "points_awarded": 18,
+          "dnf": false
+        },
+        {
+          "race_id": "circuit_03",
+          "racer_id": 4,
+          "finish_position": 3,
+          "finish_time": 68.43333333333074,
+          "fastest_lap": 29.999999999999577,
+          "bonus_points": 0,
+          "points_awarded": 15,
+          "dnf": false
+        },
+        {
+          "race_id": "circuit_03",
+          "racer_id": 2,
+          "finish_position": 4,
+          "finish_time": 75.549999999997,
+          "fastest_lap": 33.99999999999935,
+          "bonus_points": 0,
+          "points_awarded": 12,
+          "dnf": false
+        }
+      ],
+      "events": [
+        "t=12.0: road_blockage target=3",
+        "t=24.0: road_reopen target=3",
+        "t=25.0: shortcut_toggle target=10",
+        "t=38.0: oil_spill target=5",
+        "t=45.0: shortcut_toggle target=10",
+        "t=55.0: speed_restriction target=7",
+        "t=58.0: effect_expire target=5",
+        "t=70.0: effect_expire target=7"
+      ]
+    }
+  ],
+  "standings": [
+    {
+      "racer_id": 1,
+      "name": "Player",
+      "total_points": 75,
+      "wins": 3,
+      "sum_of_finish_positions": 3,
+      "best_fastest_lap": 21.30000000000007
+    },
+    {
+      "racer_id": 3,
+      "name": "Shortcut",
+      "total_points": 54,
+      "wins": 0,
+      "sum_of_finish_positions": 6,
+      "best_fastest_lap": 21.50000000000006
+    },
+    {
+      "racer_id": 4,
+      "name": "Distance",
+      "total_points": 45,
+      "wins": 0,
+      "sum_of_finish_positions": 9,
+      "best_fastest_lap": 21.50000000000006
+    },
+    {
+      "racer_id": 2,
+      "name": "Navigator",
+      "total_points": 36,
+      "wins": 0,
+      "sum_of_finish_positions": 12,
+      "best_fastest_lap": 25.499999999999833
+    }
+  ],
+  "top_3": [
+    {
+      "racer_id": 1,
+      "name": "Player",
+      "total_points": 75,
+      "wins": 3,
+      "sum_of_finish_positions": 3,
+      "best_fastest_lap": 21.30000000000007
+    },
+    {
+      "racer_id": 3,
+      "name": "Shortcut",
+      "total_points": 54,
+      "wins": 0,
+      "sum_of_finish_positions": 6,
+      "best_fastest_lap": 21.50000000000006
+    },
+    {
+      "racer_id": 4,
+      "name": "Distance",
+      "total_points": 45,
+      "wins": 0,
+      "sum_of_finish_positions": 9,
+      "best_fastest_lap": 21.50000000000006
+    }
+  ]
+}
