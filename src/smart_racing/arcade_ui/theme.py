@@ -22,13 +22,14 @@ def button_style(
     fill: tuple[int, int, int],
     text: tuple[int, int, int] = NAVY,
     border: tuple[int, int, int] | None = None,
+    font_size: int = 15,
 ) -> dict:
     """Return the versioned Arcade 3.x UIFlatButton style map."""
 
     outline = border or fill
     return {
         "normal": arcade.gui.UIFlatButton.UIStyle(
-            font_size=15,
+            font_size=font_size,
             font_name=("Aptos Display", "Arial"),
             font_color=rgba(text),
             bg=rgba(fill),
@@ -36,7 +37,7 @@ def button_style(
             border_width=1,
         ),
         "hover": arcade.gui.UIFlatButton.UIStyle(
-            font_size=15,
+            font_size=font_size,
             font_name=("Aptos Display", "Arial"),
             font_color=rgba(WHITE),
             bg=rgba(fill if fill != NAVY else (28, 57, 83)),
@@ -44,7 +45,7 @@ def button_style(
             border_width=2,
         ),
         "press": arcade.gui.UIFlatButton.UIStyle(
-            font_size=15,
+            font_size=font_size,
             font_name=("Aptos Display", "Arial"),
             font_color=rgba(NAVY),
             bg=rgba(WHITE),
@@ -52,7 +53,7 @@ def button_style(
             border_width=2,
         ),
         "disabled": arcade.gui.UIFlatButton.UIStyle(
-            font_size=15,
+            font_size=font_size,
             font_name=("Aptos Display", "Arial"),
             font_color=rgba(MUTED),
             bg=rgba((42, 54, 70)),
