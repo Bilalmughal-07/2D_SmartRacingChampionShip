@@ -18,7 +18,7 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 - Added map zoom, pan, hover inspection, directional arrows, shortcut/status overlays, environmental circuit styling, a complete legend, wrapped planning text, and an interactive road-event toggle that reroutes on the Explorer-only graph overlay.
 - Added route configuration persistence and handoff into the Racing destination, with race start blocked unless the circuit validates, all checkpoints are enabled, the source is the official start, and the resource plan is feasible.
 - Added Phase 2 regression coverage for every algorithm on every circuit, A*/Dijkstra weighted-cost agreement, source-equals-destination handling, route persistence/handoff, stale-route clearing during quick-circuit switching, and the UI A* service-key alias.
-- Inspected actual Explorer smoke frames after implementation and fixes. The current Arcade capture backend reports a 1920x1080 framebuffer on this Windows display even when logical size flags are 1280x720/1600x900; no overlap or clipping was observed in the inspected frame.
+- Inspected actual Explorer smoke frames after implementation and fixes at requested logical 1280x720, 1600x900, and 1920x1080 sizes. Windows display scaling stores the captures at 1600x900, 2000x1125, and 2400x1350 physical pixels respectively; the responsive layout was inspected at each logical target. Modal captures cover comparison, resources, road events, and start confirmation.
 
 ## Verified in this session
 
@@ -30,7 +30,7 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 - Race engine now uses `GameConfig.fixed_timestep = 1/60` and caches a route during edge traversal.
 - Race engine now accepts deterministic player throttle, brake, junction-exit, refuel, and nitro requests without allowing invalid graph edges.
 - Track Explorer now supports selectable start/destination vertices, checkpoint-aware planning, weighted route arrows, map zoom/pan/hover, wrapped descriptions, algorithm complexity/counters, exact physical metrics, fuel DP, nitro DP/Greedy recommendations, four-preset comparison, and live closure rerouting.
-- Existing algorithm, race, event, sorting, UI, championship, player-control, nitro, route-planner, track-validation, AI fuel, Explorer integration, and Arcade session tests are green (35 passed).
+- Existing algorithm, race, event, sorting, UI, championship, player-control, nitro, route-planner, track-validation, AI fuel, Explorer integration, geometry, and Arcade session tests are green (40 passed).
 - Pygame visual smoke renders all five screens at 1440x900 and 1280x720 plus one Explorer screenshot for each redesigned circuit; the racing screen now shows layered roads, procedural cars, themed scenery, gates, services, pickups, camera follow, minimap, gauges, standings, and event state.
 - All three circuits complete full deterministic races and a full championship after the redesign.
 - Experiments and technical report were regenerated after the gameplay/UI changes.

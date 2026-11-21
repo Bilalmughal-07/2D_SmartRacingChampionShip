@@ -9,7 +9,7 @@ The project uses deterministic tests plus real Arcade/Pygame smoke captures. A f
 | Closures and rerouting | `tests/integration/test_ui_smoke.py`, race tests | Explorer blocked-edge capture | Pass |
 | Fuel and nitro | `tests/unit/test_route_planner.py`, `tests/integration/test_race.py` | Racing HUD capture | Pass |
 | Main Menu | `tests/unit/test_arcade_frontend.py` | Arcade 1280/1600/1920 captures | Pass |
-| Track Explorer | route/session tests | `arcade_explorer_1280.png` and circuit captures | Pass |
+| Track Explorer | route/session, geometry, and Explorer integration tests | `arcade_explorer_overhaul_1280.png`, `_1600.png`, `_1920.png`, comparison/resources/events/start-confirmation captures | Pass |
 | Racing Screen | race replay/control/sprint tests | `arcade_race_1280.png` | Pass |
 | Algorithm Lab | catalog/session tests and algorithm unit suite | `arcade_lab_1280.png` | Pass |
 | Championship Dashboard | scoring/championship tests | `arcade_dashboard_1280.png` | Pass |
