@@ -89,6 +89,21 @@ def test_quick_circuit_switch_clears_stale_route_configuration(tmp_path):
     session.select_quick_race("circuit_03")
     assert session.selected_track_id == "circuit_03"
     assert session.route_plan is None
+    assert session.explorer_mode == "full_race"
+    assert session.explorer_return == "circuit_selection"
+
+
+def test_explorer_context_round_trips_for_algorithm_lab_return(tmp_path):
+    tracks = load_tracks()
+    session = GameSession.create(tracks, root=tmp_path)
+    session.explorer_mode = "free"
+    session.explorer_return = "explorer"
+    session.explorer_context = {"track_id": "circuit_02", "algorithm": "A*", "source": 11, "destination": 13}
+    session.save_state()
+    loaded = GameSession.create(tracks, root=tmp_path)
+    assert loaded.explorer_mode == "free"
+    assert loaded.explorer_return == "explorer"
+    assert loaded.explorer_context["algorithm"] == "A*"
 
 
 def test_explorer_maps_display_algorithm_labels_to_service_keys():
