@@ -22,6 +22,7 @@ This audit covers the functional-overhaul branch. Each control is wired to a rea
 | CLOSE / REOPEN / RESTRICT ROAD | Mutates the selected edge status | No-op status changes are ignored; real mutations invalidate the prior route | `apply_event()` and blocked-edge/no-op tests |
 | UNDO LAST / RESET EVENTS | Restores prior or canonical edge statuses | Rebuilds route validity state | event history methods |
 | RECALCULATE | Replans after a road event | Uses the modified graph revision | `recalculate_from_event_modal()` |
+| NEXT ROAD | Selects the next authoritative graph edge | Uses sorted edge IDs with wraparound; never applies an event or changes graph/route state | `cycle_event_edge()` plus all-circuit zoom/pan smoke |
 | REVIEW / START RACE | Validates the current plan and opens review | Free mode, stale route, invalid graph, wrong endpoint, and infeasible fuel are rejected | `start_race()` |
 | ACCEPT PLAN | Stores the reviewed resource decision | Required before race confirmation when resources are not yet accepted | resource modal screenshot |
 | EDIT PLAN | Closes confirmation without starting | Preserves Explorer state | start confirmation screenshot |
@@ -31,4 +32,4 @@ This audit covers the functional-overhaul branch. Each control is wired to a rea
 
 - Base states: `docs/screenshots/arcade_explorer_overhaul_1280.png`, `arcade_explorer_overhaul_1600.png`, `arcade_explorer_overhaul_1920.png`.
 - Modal states: `arcade_explorer_compare_1280.png`, `arcade_explorer_compare_1600.png`, `arcade_explorer_compare_1920.png`, `arcade_explorer_resources_1280.png`, and `arcade_explorer_start_confirm_1280.png`.
-- Split-screen event states: `arcade_explorer_events_1280.png`, `arcade_explorer_events_1440.png`, and `arcade_explorer_events_1600.png`.
+- Split-screen event states: `arcade_explorer_events_1280.png`, `arcade_explorer_events_next_1280.png`, `arcade_explorer_events_1440.png`, and `arcade_explorer_events_1600.png`.

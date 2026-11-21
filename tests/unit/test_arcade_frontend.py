@@ -252,6 +252,38 @@ def test_explorer_close_event_preview_restores_canonical_graph_and_route():
     assert view.event_history == []
 
 
+def test_explorer_next_road_cycles_all_circuit_edges_in_id_order_with_wraparound():
+    for track in load_tracks():
+        view = object.__new__(TrackExplorerView)
+        view.graph = deepcopy(track.graph())
+        view.event_edge_id = min(view.graph.edges)
+        view.event_candidate_ids = [view.event_edge_id]
+        view.event_candidate_index = 0
+        view.status_message = ""
+        view.status_color = None
+        view.zoom = 1.8
+        view.pan = [23.0, -17.0]
+        view.event_history = []
+        view.graph_revision = 7
+        view.route_result = {"path": [track.start_id, track.finish_id]}
+        view.rebuild_ui = lambda: None
+        original_statuses = {edge_id: edge.status for edge_id, edge in view.graph.edges.items()}
+
+        road_ids = sorted(view.graph.edges)
+        for expected_edge_id in road_ids[1:] + road_ids[:1]:
+            view.cycle_event_edge()
+            assert view.event_edge_id == expected_edge_id
+            assert view.event_candidate_ids == [expected_edge_id]
+            assert view.event_candidate_index == 0
+
+        assert {edge_id: edge.status for edge_id, edge in view.graph.edges.items()} == original_statuses
+        assert view.event_history == []
+        assert view.graph_revision == 7
+        assert view.route_result == {"path": [track.start_id, track.finish_id]}
+        assert view.zoom == 1.8
+        assert view.pan == [23.0, -17.0]
+
+
 def test_arcade_phase_views_expose_all_required_algorithm_families():
     assert len(CATALOG) == 12
     assert [name for name, *_ in CATALOG] == [

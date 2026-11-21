@@ -62,3 +62,10 @@ This ledger records evidence-backed work for the Smart Racing Championship final
 - Added regression coverage for restriction cost changes, undo restoration, and restoration of the canonical graph/route when the preview closes.
 - Visual verification: regenerated and inspected `docs/screenshots/arcade_explorer_events_1280.png`, `arcade_explorer_events_1440.png`, and `arcade_explorer_events_1600.png`; corrected compact-panel text/button spacing at 1280×720 and wider layouts.
 - Regression: `python -m pytest -q` → 46 passed; `python -m ruff check .` → passed.
+
+## 2026-11-21 — NEXT ROAD edge-order fix
+
+- Fixed `NEXT ROAD`: the previous callback only cycled the overlapping-road candidate list, which normally contained one selected edge and made the control appear inactive.
+- The control now advances through the authoritative sorted graph edge IDs (`E0 → E1 → E2 …`) with wraparound, updates the selected-road highlight/details, and preserves graph revision, event history, route, zoom, and pan without applying an event.
+- Verification: direct Arcade callback smoke passed on `circuit_01`, `circuit_02`, and `circuit_03` with zoom/pan enabled; `docs/screenshots/arcade_explorer_events_next_1280.png` shows the post-click E12 selection.
+- Regression: `python -m pytest -q` → 47 passed; `python -m ruff check .` → passed.

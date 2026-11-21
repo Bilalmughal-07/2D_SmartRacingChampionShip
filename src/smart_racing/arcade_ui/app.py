@@ -885,7 +885,7 @@ class TrackExplorerView(ArcadeView):
         self.add_button("REOPEN ROAD", left + 18 + compact_width, row_one, compact_width, 32, lambda: self.apply_event(EdgeStatus.OPEN), fill, text, border)
         fill, text, border = button_colors(restrict_enabled, AMBER, NAVY, AMBER)
         self.add_button("RESTRICT ROAD", left + 12, row_two, compact_width, 32, lambda: self.apply_event(EdgeStatus.RESTRICTED), fill, text, border)
-        next_enabled = len(self.event_candidate_ids) > 1
+        next_enabled = len(self.graph.edges) > 1
         fill, text, border = button_colors(next_enabled, NAVY, WHITE, CYAN)
         self.add_button("NEXT ROAD", left + 18 + compact_width, row_two, compact_width, 32, self.cycle_event_edge, fill, text, border)
         self.add_button("UNDO LAST", left + 12, row_three, compact_width, 32, self.undo_event, NAVY, WHITE, CYAN)
@@ -1316,13 +1316,20 @@ class TrackExplorerView(ArcadeView):
         self.event_after_route = deepcopy(self.route_result)
 
     def cycle_event_edge(self) -> None:
-        if len(self.event_candidate_ids) < 2:
-            self.status_message = "No overlapping road candidates need disambiguation."
+        road_ids = sorted(self.graph.edges)
+        if not road_ids:
+            self.status_message = "No roads are available on this circuit."
             self.status_color = MUTED
             return
-        self.event_candidate_index = (self.event_candidate_index + 1) % len(self.event_candidate_ids)
-        self.event_edge_id = self.event_candidate_ids[self.event_candidate_index]
-        self.status_message = f"Selected road {self.event_edge_id}; use the event controls or cycle again."
+        if self.event_edge_id in road_ids:
+            current_index = road_ids.index(self.event_edge_id)
+            next_index = (current_index + 1) % len(road_ids)
+        else:
+            next_index = 0
+        self.event_edge_id = road_ids[next_index]
+        self.event_candidate_ids = [self.event_edge_id]
+        self.event_candidate_index = 0
+        self.status_message = f"Selected road E{self.event_edge_id}; NEXT ROAD follows edge ID order."
         self.status_color = CYAN
         self.rebuild_ui()
 
