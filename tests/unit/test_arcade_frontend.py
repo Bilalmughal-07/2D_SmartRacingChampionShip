@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from smart_racing.arcade_ui.app import MainMenuView, TrackExplorerView
 from smart_racing.arcade_ui.lab_view import CATALOG
 from smart_racing.arcade_ui.session import DEFAULT_SETTINGS, GameSession
+from smart_racing.model.graph import EdgeStatus
 from smart_racing.services.race_engine import RaceEngine
 from smart_racing.services.route_planner import RoutePlanner
 from smart_racing.services.track_loader import load_tracks
@@ -164,6 +165,25 @@ def test_explorer_comparison_keeps_all_four_weighted_preset_cards():
     view.select_comparison(2)
     assert view.preset == "economy"
     assert view.route_result["preset"] == "economy"
+
+
+def test_explorer_road_event_preview_does_not_record_noop_status_change():
+    track = load_tracks()[0]
+    view = object.__new__(TrackExplorerView)
+    view.graph = deepcopy(track.graph())
+    view.event_edge_id = 0
+    view.event_history = []
+    view.graph_revision = 1
+    view.status_message = ""
+    view.status_color = None
+    view._mark_route_stale = lambda _message: None
+    view.rebuild_ui = lambda: None
+
+    view.apply_event(EdgeStatus.OPEN)
+
+    assert view.graph.edges[0].status == EdgeStatus.OPEN
+    assert view.event_history == []
+    assert view.graph_revision == 1
 
 
 def test_arcade_phase_views_expose_all_required_algorithm_families():

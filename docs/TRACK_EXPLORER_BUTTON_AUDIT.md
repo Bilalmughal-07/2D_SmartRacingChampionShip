@@ -19,7 +19,7 @@ This audit covers the functional-overhaul branch. Each control is wired to a rea
 | PLAN RESOURCES | Runs fuel feasibility plus Nitro DP/Greedy planning | Does not silently alter race rules | resource modal screenshot |
 | ROUTE STATUS | Explains current route state | Distinguishes no route, stale, invalid, feasible, infeasible | `show_route_status()` |
 | ROAD EVENT PREVIEW | Opens road selection and event actions | Events apply to Explorer graph copy only | event modal screenshot |
-| CLOSE / REOPEN / RESTRICT ROAD | Mutates the selected edge status | Every mutation invalidates the prior route | `apply_event()` and blocked-edge test |
+| CLOSE / REOPEN / RESTRICT ROAD | Mutates the selected edge status | No-op status changes are ignored; real mutations invalidate the prior route | `apply_event()` and blocked-edge/no-op tests |
 | UNDO LAST / RESET EVENTS | Restores prior or canonical edge statuses | Rebuilds route validity state | event history methods |
 | RECALCULATE | Replans after a road event | Uses the modified graph revision | `recalculate_from_event_modal()` |
 | REVIEW / START RACE | Validates the current plan and opens review | Free mode, stale route, invalid graph, wrong endpoint, and infeasible fuel are rejected | `start_race()` |

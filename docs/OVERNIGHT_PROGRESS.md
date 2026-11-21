@@ -47,3 +47,10 @@ This ledger records evidence-backed work for the Smart Racing Championship final
 - Added symmetric selectable route cards with Time, Distance, Fuel, Cost, and Valid metrics, selected-state highlighting, invalid-candidate preservation, and responsive modal geometry.
 - Visual verification: inspected updated comparison captures at logical 1280x720 and 1600x900; fixed modal layering, focus outline leakage, and card metric/title overlap.
 - Regression: `python -m pytest -q` → 41 passed; `python -m ruff check .` → passed.
+
+## 2026-11-21 — Road Event Preview polish
+
+- Expanded the event modal with selected-road identity, direction, physical metrics, current status, shortcut/active-route flags, geometry, workflow instructions, temporary-change count, graph revision, and route status.
+- Added a no-op guard so applying the already-active status does not create false event history or invalidate a route.
+- Visual verification: inspected `docs/screenshots/arcade_explorer_events_1280.png` after the modal update.
+- Regression: `python -m pytest -q` → 42 passed; `python -m ruff check .` → passed.

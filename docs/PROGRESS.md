@@ -30,7 +30,7 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 - Race engine now uses `GameConfig.fixed_timestep = 1/60` and caches a route during edge traversal.
 - Race engine now accepts deterministic player throttle, brake, junction-exit, refuel, and nitro requests without allowing invalid graph edges.
 - Track Explorer now supports selectable start/destination vertices, checkpoint-aware planning, weighted route arrows, map zoom/pan/hover, wrapped descriptions, algorithm complexity/counters, exact physical metrics, fuel DP, nitro DP/Greedy recommendations, four-preset comparison, and live closure rerouting.
-- Existing algorithm, race, event, sorting, UI, championship, player-control, nitro, route-planner, track-validation, AI fuel, Explorer integration, geometry, comparison-card, and Arcade session tests are green (41 passed).
+- Existing algorithm, race, event, sorting, UI, championship, player-control, nitro, route-planner, track-validation, AI fuel, Explorer integration, geometry, comparison-card, road-event-preview, and Arcade session tests are green (42 passed).
 - Pygame visual smoke renders all five screens at 1440x900 and 1280x720 plus one Explorer screenshot for each redesigned circuit; the racing screen now shows layered roads, procedural cars, themed scenery, gates, services, pickups, camera follow, minimap, gauges, standings, and event state.
 - All three circuits complete full deterministic races and a full championship after the redesign.
 - Experiments and technical report were regenerated after the gameplay/UI changes.
