@@ -15,7 +15,7 @@ This audit covers the functional-overhaul branch. Each control is wired to a rea
 | SOURCE / DESTINATION | Arms click selection in Free Exploration | Guarded in Full Race Plan | `set_selection_mode()` and map click handler |
 | VIEW CHECKPOINT SEQUENCE | Shows mandatory ordered targets | Full-plan information only | checkpoint modal screenshot |
 | CALCULATE ROUTE | Runs the shared RoutePlanner on the current graph copy | Reports invalid/unreachable/stale state | route tests and Explorer frame |
-| COMPARE ROUTES | Computes distinct candidates from the same graph/objective | Deduplicates identical paths | comparison modal screenshot |
+| COMPARE ROUTES | Computes all four weighted candidates from the same graph/objective | Preserves identical paths as separate objective candidates and shows unavailable candidates as invalid | comparison modal screenshots |
 | PLAN RESOURCES | Runs fuel feasibility plus Nitro DP/Greedy planning | Does not silently alter race rules | resource modal screenshot |
 | ROUTE STATUS | Explains current route state | Distinguishes no route, stale, invalid, feasible, infeasible | `show_route_status()` |
 | ROAD EVENT PREVIEW | Opens road selection and event actions | Events apply to Explorer graph copy only | event modal screenshot |
@@ -30,4 +30,4 @@ This audit covers the functional-overhaul branch. Each control is wired to a rea
 ## Visual evidence
 
 - Base states: `docs/screenshots/arcade_explorer_overhaul_1280.png`, `arcade_explorer_overhaul_1600.png`, `arcade_explorer_overhaul_1920.png`.
-- Modal states: `arcade_explorer_compare_1280.png`, `arcade_explorer_resources_1280.png`, `arcade_explorer_events_1280.png`, and `arcade_explorer_start_confirm_1280.png`.
+- Modal states: `arcade_explorer_compare_1280.png`, `arcade_explorer_compare_1600.png`, `arcade_explorer_compare_1920.png`, `arcade_explorer_resources_1280.png`, `arcade_explorer_events_1280.png`, and `arcade_explorer_start_confirm_1280.png`.

@@ -40,3 +40,10 @@ This ledger records evidence-backed work for the Smart Racing Championship final
 - Added: authoritative geometry validator and circuit-01 duplicate-coordinate correction; all three circuits pass geometry validation with warnings recorded separately from errors.
 - Visual QA: inspected base Explorer frames at requested logical 1280x720, 1600x900, and 1920x1080 sizes, plus comparison, resource, road-event, and start-confirmation modal frames. Fixed a fullscreen smoke-size bug, narrow-width label/title collisions, a resource-modal tuple bug, and modal button overlap.
 - Verification: `python -m pytest -q` → 40 passed; `python -m ruff check .` → passed; `python -m compileall -q src tests run_*.py build_report.py` → passed. Full validation, championship, experiments, and report audits remain part of the final pre-push gate.
+
+## 2026-11-21 — Four-preset comparison correction
+
+- Corrected the Explorer comparison workflow so it always displays Balanced, Speed, Economy, and Safety from the shared weighted planner; identical paths remain separate objective candidates instead of being deduplicated.
+- Added symmetric selectable route cards with Time, Distance, Fuel, Cost, and Valid metrics, selected-state highlighting, invalid-candidate preservation, and responsive modal geometry.
+- Visual verification: inspected updated comparison captures at logical 1280x720 and 1600x900; fixed modal layering, focus outline leakage, and card metric/title overlap.
+- Regression: `python -m pytest -q` → 41 passed; `python -m ruff check .` → passed.

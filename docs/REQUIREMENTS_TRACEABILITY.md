@@ -42,7 +42,7 @@ Source priority: the supplied `Project.pdf` is authoritative; the implementation
 | Multi-objective bonus | PDF 8.2 | cost presets | Explorer | preset comparison | VERIFIED | four presets |
 | Live top-k bonus | PDF 8.3 | heap `nsmallest` top-k | Dashboard service | top-k test | VERIFIED | comparator equality |
 | Responsive UI evidence | Improvement prompt 8/19, Phase 1 prompt | `tools/visual_smoke.py`, `docs/screenshots/` | all screens | real Pygame render plus Arcade smoke at 1280x720, 1600x900, 1920x1080 | VERIFIED | Pygame screenshots; latest Arcade menu, settings, instructions, circuit selection, Explorer, Racing, Lab, and Dashboard frames inspected |
-| Required tests | PDF 9.1 | `tests/` | n/a | `python -m pytest -q` | VERIFIED | 40 passed |
+| Required tests | PDF 9.1 | `tests/` | n/a | `python -m pytest -q` | VERIFIED | 41 passed |
 | Technical report | PDF 9.2 | `build_report.py` | n/a | PDF render inspection | VERIFIED | 5-page report |
 | Submission package | PDF 9.3 | `build_submission.ps1` | n/a | archive manifest/open | VERIFIED | ZIP generated |
 | Explorer route configuration handoff | Improvement task | `GameSession.route_plan` → Racing destination | Explorer -> Racing | `test_route_configuration_transfers_from_explorer_to_race_session` + direct view smoke | VERIFIED | circuit, algorithm, preset, endpoints, path, edge IDs, metrics, fuel plan |
