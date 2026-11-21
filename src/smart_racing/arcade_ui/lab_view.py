@@ -390,26 +390,10 @@ class AlgorithmLabView(ArcadeView):
         return (-item["total_points"], -item["wins"], item["sum_of_finish_positions"], item["best_fastest_lap"] if item["best_fastest_lap"] is not None else float("inf"), item["racer_id"])
 
     def compare(self):
+        from smart_racing.arcade_ui.comparison_view import AlgorithmComparisonView
+
         self.playing = False
-        try:
-            if self.category == "Graph & Routing":
-                planner, graph = RoutePlanner(self.track, self.preset), self.track.graph()
-                left = dijkstra(graph, self.source_id, self.target_id, edge_cost=planner.cost_model.cost)
-                right = astar(graph, self.source_id, self.target_id, edge_cost=planner.cost_model.cost, heuristic=lambda _a, _b: 0.0)
-                self.comparison = {"title": "Dijkstra vs A*", "left": left, "right": right, "metric": "weighted cost", "same": left.cost == right.cost}
-            elif self.category == "Optimization":
-                left, right = knapsack_01(self._knapsack_items(), 10), greedy_knapsack(self._knapsack_items(), 10)
-                self.comparison = {"title": "DP vs Greedy", "left": left, "right": right, "metric": "benefit", "same": left.value == right.value}
-            elif self.category == "Sorting":
-                records = self._sample_records()
-                left, right, third = merge_sort(records, key=self._ranking_key), quick_sort(records, key=self._ranking_key), heap_sort(records, key=self._ranking_key)
-                self.comparison = {"title": "Merge vs Quick vs Heap Sort", "left": left, "right": right, "third": third, "metric": "identical ranking", "same": left == right == third}
-            else:
-                self.comparison = {"title": f"{self.algorithm_name} execution summary", "left": self.result, "right": None, "metric": "shared implementation", "same": True}
-            self.status = "Comparison completed from fresh production-algorithm executions."
-        except (ValueError, KeyError, TypeError) as exc:
-            self.error, self.status = str(exc), f"Comparison failed: {exc}"
-        self.rebuild_ui()
+        self.app.show_view(AlgorithmComparisonView(self.app, self.session, self.algorithm_name))
 
     def run_experiment(self):
         samples = []

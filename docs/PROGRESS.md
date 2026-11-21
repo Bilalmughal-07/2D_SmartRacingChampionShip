@@ -56,6 +56,14 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 - Visual evidence inspected: `algorithm_lab_1280.png`, `algorithm_lab_1600.png`, `algorithm_lab_1920.png`, plus graph/DP/heap/sorting category captures. Logical 1280×720, 1600×900, and 1920×1080 layouts remain readable under Windows display scaling.
 - Verification after the overhaul: 47 tests passed, Ruff passed, all algorithm/circuit combinations executed without errors, and playback/compare/experiment controls completed successfully.
 
+## Manual two-algorithm comparison (2026-11-21)
+
+- Added `AlgorithmComparisonView`, opened by the main Lab `COMPARE` action, with independent Algorithm 1 and Algorithm 2 selectors. The left/right order is preserved and no comparison partner is substituted automatically.
+- Supported pair categories are Graph Traversal (BFS/DFS), Weighted Routing (Dijkstra/A*), Resource Optimization (0/1 Knapsack DP/Greedy), and Championship Sorting (any two of Merge/Quick/Heap Sort). MST, Backtracking, and Event Min-Heap remain standalone demonstrations because a second production partner is not implemented for them.
+- Added shared circuit/source/target/cost/event-revision/budget controls, validation for missing/same/incompatible selections, isolated graph snapshots, actual per-side traces, synchronized playback, independent trace lengths, step explanations, pseudocode, metrics, computed conclusions, and JSON export.
+- Visual evidence inspected in `docs/screenshots/algorithm_comparison_weighted_1280.png`; the equal-weight side-by-side workspace is readable at the 1280×720 target and retains the dark racing telemetry theme.
+- Comparison audit: all four categories executed, reverse sorting order produced the same ranking, invalid pairs were rejected, stale results were cleared, and playback/reset/export paths were exercised.
+
 ## Next actions
 
 1. Rebuild the final ZIP after replacing the placeholder registration numbers and section.

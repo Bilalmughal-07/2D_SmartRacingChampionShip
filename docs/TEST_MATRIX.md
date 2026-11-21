@@ -11,7 +11,7 @@ The project uses deterministic tests plus real Arcade/Pygame smoke captures. A f
 | Main Menu | `tests/unit/test_arcade_frontend.py` | Arcade 1280/1600/1920 captures | Pass |
 | Track Explorer | route/session, geometry, comparison-card, road-event, NEXT ROAD, and Explorer integration tests | `arcade_explorer_overhaul_1280.png`, `_1600.png`, `_1920.png`, `arcade_explorer_events_1280.png`, `arcade_explorer_events_next_1280.png`, `_1440.png`, `_1600.png`, responsive comparison/resources/start-confirmation captures | Pass |
 | Racing Screen | race replay/control/sprint tests | `arcade_race_1280.png` | Pass |
-| Algorithm Lab | catalog/session tests, trace-hook tests, algorithm unit suite, direct 13-entry × 3-circuit execution audit | `algorithm_lab_1280.png`, `algorithm_lab_1600.png`, `algorithm_lab_1920.png`, graph/DP/heap/sorting captures | Pass |
+| Algorithm Lab | catalog/session tests, comparison-selection tests, trace-hook tests, algorithm unit suite, direct 13-entry × 3-circuit and four-category comparison audit | `algorithm_lab_1280.png`, `algorithm_lab_1600.png`, `algorithm_lab_1920.png`, graph/DP/heap/sorting captures, `algorithm_comparison_weighted_1280.png` | Pass |
 | Championship Dashboard | scoring/championship tests | `arcade_dashboard_1280.png` | Pass |
 | Release path | build scripts and clean extraction smoke | report, executable, ZIP manifest | Re-run after final edits |
 

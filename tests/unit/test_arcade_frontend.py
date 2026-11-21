@@ -4,6 +4,10 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 from smart_racing.arcade_ui.app import MainMenuView, TrackExplorerView
+from smart_racing.arcade_ui.comparison_view import (
+    comparison_algorithms,
+    validate_comparison_selection,
+)
 from smart_racing.arcade_ui.lab_view import CATALOG
 from smart_racing.arcade_ui.session import DEFAULT_SETTINGS, GameSession
 from smart_racing.model.graph import EdgeStatus
@@ -301,6 +305,17 @@ def test_arcade_phase_views_expose_all_required_algorithm_families():
         "Quick Sort",
         "Heap Sort",
     ]
+
+
+def test_manual_algorithm_comparison_selection_is_independent_and_validated():
+    assert comparison_algorithms("Graph Traversal") == ("BFS", "DFS")
+    assert comparison_algorithms("Weighted Routing") == ("Dijkstra", "A*")
+    assert comparison_algorithms("Championship Sorting") == ("Merge Sort", "Quick Sort", "Heap Sort")
+    assert validate_comparison_selection("Weighted Routing", "Dijkstra", "A*") is None
+    assert validate_comparison_selection("Weighted Routing", "A*", "Dijkstra") is None
+    assert validate_comparison_selection("Weighted Routing", "Dijkstra", "Dijkstra") == "Please select two different algorithms."
+    assert validate_comparison_selection("Weighted Routing", "BFS", "Merge Sort") == "These algorithms solve different problem types and cannot be directly compared in this mode."
+    assert validate_comparison_selection("Weighted Routing", None, "A*") == "Please select two algorithms."
 
 
 def test_session_records_championship_races_once_and_advances_order(tmp_path):

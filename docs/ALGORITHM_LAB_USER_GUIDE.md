@@ -35,3 +35,16 @@ The assignment defines 12 algorithm families. Refuelling DP is shown as an addit
 - `EXPORT` writes the selected algorithm, inputs, trace, result, comparison, and experiment data to `data/arcade_lab_export.json`.
 
 Results are calculated from the current repository implementation. The UI does not use illustrative placeholder paths, fabricated counters, or disconnected demo graphs.
+
+## Manual comparison workspace
+
+The Compare screen lets you choose Algorithm 1 and Algorithm 2 independently. Supported pair categories are:
+
+- Graph Traversal: BFS and DFS.
+- Weighted Routing: Dijkstra and A*.
+- Resource Optimization: 0/1 Knapsack DP and Greedy.
+- Championship Sorting: any two of Merge Sort, Quick Sort, and Heap Sort.
+
+The screen rejects missing, duplicate, and incompatible selections. Both sides receive isolated copies of the same circuit graph or dataset, with the same source, destination, cost strategy, event scenario, graph revision, comparator, and tie-breaking rules. Reverse ordering is valid and remains visible left-to-right.
+
+After `RUN COMPARISON`, use the synchronized playback controls to advance both traces. If one trace finishes earlier, its completed state remains visible while the other continues. The results area reports only metrics relevant to the selected category and generates a conclusion from the measured outputs. `EXPORT` writes the full comparison, input fingerprint, trace data, counters, timing method, and conclusion to `data/arcade_lab_comparison.json`.

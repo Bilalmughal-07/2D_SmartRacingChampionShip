@@ -78,3 +78,12 @@ This ledger records evidence-backed work for the Smart Racing Championship final
 - Added playback state, run/pause, previous/next, reset, speed selection, timeline seeking, pseudocode, explanations, complexity, counters, compare, experiment, export, help, circuit switching, source/target cycling, and context-aware Back navigation.
 - Visual QA: inspected logical 1280×720, 1600×900, and 1920×1080 captures plus distinct graph, DP, heap, and sorting category frames; corrected header navigation collision, panel label overlap, event constructor state, inspector result formatting, and compact timeline placement.
 - Verification: `python -m pytest -q` → 47 passed; `python -m ruff check .` → passed; 13 algorithm entries executed on all 3 circuits; control audit completed without errors.
+
+## 2026-11-21 — Manual comparison workspace
+
+- Added a separate `AlgorithmComparisonView` reached from the Lab Compare action. Algorithm 1 and Algorithm 2 are independent, user-controlled selections; reverse ordering is supported.
+- Supported comparisons: BFS/DFS, Dijkstra/A*, 0/1 Knapsack DP/Greedy, and any two of Merge/Quick/Heap Sort. No fabricated MST partner was added; Kruskal remains a standalone demonstration.
+- Added shared input controls, road-event scenario/revision, exact isolated snapshots, validation, side-by-side algorithm-specific visualizations, synchronized playback, per-side metrics, computed conclusions, and JSON export.
+- Fixed stale-result handling so invalid submissions cannot leave an old comparison displayed.
+- Visual QA: inspected `docs/screenshots/algorithm_comparison_weighted_1280.png` at the logical 1280×720 target; no panel overlap or header collision remained after the comparison-title/subtitle correction.
+- Verification: all four categories executed, reverse sorting matched, invalid pairs rejected, stale results cleared, and playback/reset/export paths exercised.
