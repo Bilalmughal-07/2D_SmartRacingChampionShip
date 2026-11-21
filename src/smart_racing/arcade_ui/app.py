@@ -24,6 +24,7 @@ from smart_racing.arcade_ui.theme import (
     rgba,
 )
 from smart_racing.model.graph import EdgeStatus, VertexType
+from smart_racing.services.geometry_validator import validate_geometry
 from smart_racing.services.route_planner import ALGORITHM_COMPLEXITY, RoutePlanner
 from smart_racing.services.track_validator import TrackValidator
 
@@ -71,7 +72,10 @@ class ArcadeApp(arcade.Window):
             width=window_width,
             height=window_height,
             title="Smart Racing Championship — Arcade",
-            fullscreen=bool(session.settings["fullscreen"]),
+            # An explicit smoke/test size must be respected even when a prior
+            # user session persisted fullscreen=True. Normal launches still
+            # honour the saved fullscreen preference when no size is supplied.
+            fullscreen=bool(session.settings["fullscreen"]) and size is None,
             resizable=True,
             vsync=True,
             center_window=True,
@@ -105,6 +109,7 @@ class ArcadeView(arcade.View):
         self.ui = UIManager(window)
         self.buttons: list[tuple[UIFlatButton, tuple[float, float, float, float], Callable[[], None]]] = []
         self.focus_index = 0
+        self.base_button_count = 0
 
     def on_show_view(self):
         self.ui.enable()
@@ -117,6 +122,7 @@ class ArcadeView(arcade.View):
         self.ui.clear()
         self.buttons.clear()
         self.focus_index = 0
+        self.base_button_count = 0
 
     def add_button(
         self,
@@ -129,14 +135,19 @@ class ArcadeView(arcade.View):
         fill=NAVY,
         text=WHITE,
         border=None,
+        font_size: int | None = None,
     ) -> UIFlatButton:
+        # Dense explorer controls remain readable at the 1280x720 target
+        # without changing the visual scale of wider layouts.
+        if font_size is None:
+            font_size = 15 if width >= 190 else (13 if width >= 145 else 11)
         button = UIFlatButton(
             text=label,
             x=x,
             y=y,
             width=width,
             height=height,
-            style=button_style(fill, text, border),
+            style=button_style(fill, text, border, font_size),
         )
         button.on_click = lambda _event: callback()
         self.ui.add(button)
@@ -169,7 +180,15 @@ class ArcadeView(arcade.View):
             self.go_menu()
 
     def go_menu(self) -> None:
-        self.app.show_view(MainMenuView(self.app, self.session))
+        target = self.session.explorer_return
+        if target == "circuit_selection":
+            self.app.show_view(CircuitSelectionView(self.app, self.session))
+        elif target == "dashboard":
+            from smart_racing.arcade_ui.dashboard_view import ChampionshipDashboardView
+
+            self.app.show_view(ChampionshipDashboardView(self.app, self.session))
+        else:
+            self.app.show_view(MainMenuView(self.app, self.session))
 
     def draw_focus(self) -> None:
         if not self.buttons:
@@ -250,11 +269,16 @@ class MainMenuView(ArcadeView):
                 self.open_modal("championship")
             else:
                 self.session.start_new_championship()
+                self.session.explorer_mode = "full_race"
+                self.session.explorer_return = "menu"
                 self.show_explorer()
         elif action == "quick":
             self.window.show_view(CircuitSelectionView(self.app, self.session))
         elif action == "explorer":
             self.session.mode = "quick"
+            self.session.explorer_mode = "free"
+            self.session.explorer_return = "menu"
+            self.session.explorer_context = {}
             self.session.save_state()
             self.show_explorer()
         elif action == "lab":
@@ -625,8 +649,9 @@ class TrackExplorerView(ArcadeView):
             0,
         )
         self.algorithm = session.selected_algorithm if session.selected_algorithm in self.ALGORITHMS else "Dijkstra"
-        self.preset = "balanced"
-        self.checkpoint_aware = True
+        context = session.explorer_context if isinstance(session.explorer_context, dict) else {}
+        self.preset = context.get("preset", "balanced") if context.get("preset") in self.PRESETS else "balanced"
+        self.explorer_mode = session.explorer_mode if session.explorer_mode in {"free", "full_race"} else ("full_race" if session.mode == "championship" else "free")
         self.selection_mode = "source"
         self.source_id = 0
         self.destination_id = 0
@@ -635,8 +660,22 @@ class TrackExplorerView(ArcadeView):
         self.hover_edge_id: int | None = None
         self.route_result: dict | None = None
         self.comparison: dict[str, dict] = {}
+        self.comparison_candidates: list[tuple[str, dict]] = []
+        self.comparison_selected_preset = self.preset
+        self.resource_accepted = False
+        self.modal: str | None = None
+        self.event_edge_id: int | None = None
+        self.event_history: list[tuple[int, EdgeStatus]] = []
+        self.event_base_status: dict[int, EdgeStatus] = {}
+        self.event_type = "close"
+        self.inspected_edge_id: int | None = None
+        self.inspection_active = False
+        self.route_state = "NO_ROUTE"
+        self.graph_revision = 0
+        self.route_revision = -1
         self.graph = None
         self.validation = None
+        self.geometry = None
         self.status_message = "Select a source or destination vertex, then calculate a route."
         self.status_color = MUTED
         self.zoom = 1.0
@@ -649,8 +688,21 @@ class TrackExplorerView(ArcadeView):
         self.side_rect = (0, 0, 1, 1)
         super().__init__(window, session)
         self.load_track(reset_route=True)
+        if context.get("track_id") == self.track.id:
+            if self.explorer_mode == "free":
+                self.source_id = int(context.get("source", self.source_id))
+                self.destination_id = int(context.get("destination", self.destination_id))
+            self.selected_vertex_id = self.source_id
         if self.validation.valid:
             self.calculate_route()
+
+    @property
+    def checkpoint_aware(self) -> bool:
+        return self.explorer_mode == "full_race"
+
+    @checkpoint_aware.setter
+    def checkpoint_aware(self, value: bool) -> None:
+        self.explorer_mode = "full_race" if value else "free"
 
     @property
     def track(self):
@@ -662,6 +714,10 @@ class TrackExplorerView(ArcadeView):
         # engine's authoritative track definition.
         self.graph = deepcopy(self.track.graph())
         self.validation = TrackValidator().validate(self.track)
+        self.geometry = validate_geometry(self.track)
+        self.event_base_status = {edge_id: edge.status for edge_id, edge in self.graph.edges.items()}
+        self.event_history = []
+        self.graph_revision += 1
         self.source_id = self.track.start_id
         self.destination_id = self.track.finish_id
         self.selected_vertex_id = self.source_id
@@ -671,6 +727,10 @@ class TrackExplorerView(ArcadeView):
         if reset_route:
             self.route_result = None
             self.comparison = {}
+            self.comparison_candidates = []
+            self.resource_accepted = False
+            self.route_state = "NO_ROUTE"
+            self.route_revision = -1
         if self.validation.valid:
             self.status_message = "Circuit validated. Select vertices or calculate the default lap plan."
             self.status_color = EMERALD
@@ -692,7 +752,11 @@ class TrackExplorerView(ArcadeView):
         self.add_button("ALGORITHM LAB", 350, nav_y, 160, 38, self.open_lab, NAVY, WHITE, CYAN)
 
         left, bottom, width, height = self.side_rect
-        algorithm_y = bottom + height - 100
+        mode_y = bottom + height - 96
+        mode_width = (width - 30) / 2
+        self.add_button("FREE EXPLORATION", left + 12, mode_y, mode_width, 34, lambda: self.set_explorer_mode("free"), CYAN if self.explorer_mode == "free" else NAVY, NAVY if self.explorer_mode == "free" else WHITE, CYAN)
+        self.add_button("FULL RACE PLAN", left + 18 + mode_width, mode_y, mode_width, 34, lambda: self.set_explorer_mode("full_race"), EMERALD if self.explorer_mode == "full_race" else NAVY, NAVY if self.explorer_mode == "full_race" else WHITE, EMERALD)
+        algorithm_y = mode_y - 46
         button_width = max(58, (width - 48) / 4)
         for index, algorithm in enumerate(self.ALGORITHMS):
             fill = CYAN if algorithm == self.algorithm else NAVY
@@ -726,29 +790,88 @@ class TrackExplorerView(ArcadeView):
                 (83, 112, 139),
             )
         select_y = preset_y - 47
-        self.add_button("SOURCE", left + 12, select_y, (width - 30) / 2, 34, lambda: self.set_selection_mode("source"), EMERALD if self.selection_mode == "source" else NAVY, NAVY if self.selection_mode == "source" else WHITE, EMERALD)
-        self.add_button("DESTINATION", left + 18 + (width - 30) / 2, select_y, (width - 30) / 2, 34, lambda: self.set_selection_mode("destination"), EMERALD if self.selection_mode == "destination" else NAVY, NAVY if self.selection_mode == "destination" else WHITE, EMERALD)
+        if self.explorer_mode == "free":
+            self.add_button("SOURCE", left + 12, select_y, (width - 30) / 2, 34, lambda: self.set_selection_mode("source"), EMERALD if self.selection_mode == "source" else NAVY, NAVY if self.selection_mode == "source" else WHITE, EMERALD)
+            self.add_button("DESTINATION", left + 18 + (width - 30) / 2, select_y, (width - 30) / 2, 34, lambda: self.set_selection_mode("destination"), EMERALD if self.selection_mode == "destination" else NAVY, NAVY if self.selection_mode == "destination" else WHITE, EMERALD)
+        else:
+            self.add_button("VIEW CHECKPOINT SEQUENCE", left + 12, select_y, width - 24, 34, self.open_checkpoint_modal, NAVY, WHITE, EMERALD)
         action_y = select_y - 49
         self.add_button("CALCULATE ROUTE", left + 12, action_y, width - 24, 38, self.calculate_route, CYAN, NAVY, CYAN)
         compare_y = action_y - 47
         self.add_button("COMPARE ROUTES", left + 12, compare_y, (width - 30) / 2, 34, self.compare_routes, NAVY, WHITE, CYAN)
         self.add_button("PLAN RESOURCES", left + 18 + (width - 30) / 2, compare_y, (width - 30) / 2, 34, self.plan_resources, NAVY, WHITE, CYAN)
         toggle_y = compare_y - 47
-        self.add_button("CHECKPOINT MODE: ON" if self.checkpoint_aware else "CHECKPOINT MODE: OFF", left + 12, toggle_y, width - 24, 32, self.toggle_checkpoint_mode, NAVY, WHITE, AMBER)
+        self.add_button("ROUTE STATUS: " + self.route_state.replace("_", " "), left + 12, toggle_y, width - 24, 32, self.show_route_status, NAVY, WHITE, AMBER)
         event_y = toggle_y - 44
-        self.add_button("TOGGLE ROAD EVENT", left + 12, event_y, width - 24, 32, self.toggle_closure, NAVY, WHITE, CORAL)
+        self.add_button("ROAD EVENT PREVIEW", left + 12, event_y, width - 24, 32, self.open_event_modal, NAVY, WHITE, CORAL)
         start_y = bottom + 12
-        self.add_button("START RACE", left + 12, start_y, width - 24, 40, self.start_race, EMERALD, NAVY, EMERALD)
+        self.add_button("REVIEW / START RACE", left + 12, start_y, width - 24, 40, self.start_race, EMERALD, NAVY, EMERALD)
+        self.base_button_count = len(self.buttons)
+        modal_height = min(430, int(self.window.height * 0.60))
+        modal_bottom = max(170, (self.window.height - modal_height) / 2)
+        if self.modal == "comparison":
+            _left, comparison_bottom, _width, _height = self.comparison_modal_geometry()
+            self.add_button("CLOSE COMPARISON", self.window.width / 2 - 110, comparison_bottom + 18, 220, 38, self.close_modal, NAVY, WHITE, CYAN)
+            for index, (label, report) in enumerate(self.comparison_candidates[:4]):
+                card_left, card_bottom, card_width, card_height = self.comparison_card_rect(index)
+                preset = report.get("preset") if report else label.split()[0].lower()
+                selected = preset == self.comparison_selected_preset
+                self.add_button(
+                    "SELECTED" if selected else "SELECT",
+                    card_left + card_width - 126,
+                    card_bottom + card_height - 38,
+                    108,
+                    28,
+                    lambda index=index: self.select_comparison(index),
+                    CYAN if selected else NAVY,
+                    NAVY if selected else WHITE,
+                    CYAN,
+                )
+        elif self.modal == "resources":
+            self.add_button("ACCEPT PLAN", self.window.width / 2 - 220, modal_bottom + 18, 200, 38, self.accept_resource_plan, EMERALD, NAVY, EMERALD)
+            self.add_button("CLOSE", self.window.width / 2 + 10, modal_bottom + 18, 150, 38, self.close_modal, NAVY, WHITE, CYAN)
+        elif self.modal == "events":
+            self.add_button("CLOSE ROAD", self.window.width / 2 - 360, modal_bottom + 18, 150, 34, lambda: self.apply_event(EdgeStatus.BLOCKED), CORAL, WHITE, CORAL)
+            self.add_button("REOPEN ROAD", self.window.width / 2 - 195, modal_bottom + 18, 150, 34, lambda: self.apply_event(EdgeStatus.OPEN), EMERALD, NAVY, EMERALD)
+            self.add_button("RESTRICT ROAD", self.window.width / 2 - 30, modal_bottom + 18, 150, 34, lambda: self.apply_event(EdgeStatus.RESTRICTED), AMBER, NAVY, AMBER)
+            self.add_button("UNDO LAST", self.window.width / 2 + 135, modal_bottom + 18, 130, 34, self.undo_event, NAVY, WHITE, CYAN)
+            self.add_button("RESET EVENTS", self.window.width / 2 + 280, modal_bottom + 18, 140, 34, self.reset_events, NAVY, WHITE, CORAL)
+            self.add_button("RECALCULATE", self.window.width / 2 - 180, modal_bottom + 62, 160, 32, self.recalculate_from_event_modal, CYAN, NAVY, CYAN)
+            self.add_button("CLOSE", self.window.width / 2 + 5, modal_bottom + 62, 140, 32, self.close_modal, NAVY, WHITE, CYAN)
+        elif self.modal == "start_confirm":
+            self.add_button("EDIT PLAN", self.window.width / 2 - 180, modal_bottom + 18, 150, 40, self.close_modal, NAVY, WHITE, CYAN)
+            self.add_button("CONFIRM & START RACE", self.window.width / 2 - 15, modal_bottom + 18, 250, 40, self.confirm_start_race, EMERALD, NAVY, EMERALD)
+        elif self.modal == "checkpoint":
+            self.add_button("CLOSE", self.window.width / 2 - 80, modal_bottom + 18, 160, 38, self.close_modal, NAVY, WHITE, CYAN)
+        if self.modal and len(self.buttons) > self.base_button_count:
+            self.focus_index = self.base_button_count
 
     def on_resize(self, width: int, height: int):
         super().on_resize(width, height)
         self.rebuild_ui()
 
     def go_menu(self) -> None:
-        self.app.show_view(MainMenuView(self.app, self.session))
+        target = self.session.explorer_return
+        if target == "circuit_selection":
+            self.app.show_view(CircuitSelectionView(self.app, self.session))
+        elif target == "dashboard":
+            from smart_racing.arcade_ui.dashboard_view import ChampionshipDashboardView
+
+            self.app.show_view(ChampionshipDashboardView(self.app, self.session))
+        else:
+            self.app.show_view(MainMenuView(self.app, self.session))
 
     def open_lab(self) -> None:
         self.session.selected_algorithm = self.algorithm
+        self.session.explorer_context = {
+            "track_id": self.track.id,
+            "algorithm": self.algorithm,
+            "preset": self.preset,
+            "explorer_mode": self.explorer_mode,
+            "source": self.source_id,
+            "destination": self.destination_id,
+        }
+        self.session.explorer_return = "explorer"
         self.session.save_state()
         self.app.show_view(AlgorithmLabView(self.app, self.session))
 
@@ -759,6 +882,68 @@ class TrackExplorerView(ArcadeView):
         self.status_message = "Map view reset; route/session state preserved."
         self.status_color = CYAN
 
+    def set_explorer_mode(self, mode: str) -> None:
+        if mode not in {"free", "full_race"}:
+            return
+        self.explorer_mode = mode
+        self.session.explorer_mode = mode
+        self.session.save_state()
+        self.route_result = None
+        self.comparison = {}
+        self.comparison_candidates = []
+        self.resource_accepted = False
+        self.route_state = "NO_ROUTE"
+        if mode == "full_race":
+            self.source_id = self.track.start_id
+            self.destination_id = self.track.finish_id
+            self.selection_mode = "source"
+            self.status_message = "Full Race Plan: START → CP1 → … → CP10 → FINISH."
+            self.status_color = EMERALD
+        else:
+            self.status_message = "Free Exploration: choose any source and destination; this route cannot start a race."
+            self.status_color = CYAN
+        self.rebuild_ui()
+
+    def show_route_status(self) -> None:
+        self.status_message = {
+            "NO_ROUTE": "No route calculated yet.",
+            "ROUTE_READY": "Route ready for exploration.",
+            "ROUTE_STALE": "Route is stale because the graph or objective changed; recalculate.",
+            "ROUTE_INVALID": "Route is invalid under the current graph.",
+            "PLAN_FEASIBLE": "Race plan is valid and fuel-feasible; accept resources before starting.",
+            "PLAN_INFEASIBLE": "Race plan is not fuel-feasible; open Plan Resources for the reason.",
+        }.get(self.route_state, self.route_state)
+        self.status_color = CORAL if "INVALID" in self.route_state or "INFEASIBLE" in self.route_state else CYAN
+
+    def open_checkpoint_modal(self) -> None:
+        self.modal = "checkpoint"
+        self.rebuild_ui()
+
+    def open_event_modal(self) -> None:
+        self.modal = "events"
+        self.event_edge_id = self.event_edge_id or (self.route_result or {}).get("metrics", {}).get("edge_ids", [None])[0]
+        self.status_message = "Road Event Preview: click a road, then apply Close, Reopen, or Restrict."
+        self.status_color = AMBER
+        self.rebuild_ui()
+
+    def close_modal(self) -> None:
+        self.modal = None
+        self.rebuild_ui()
+
+    def _mark_route_stale(self, message: str) -> None:
+        if self.route_result is not None:
+            self.route_state = "ROUTE_STALE"
+        else:
+            self.route_state = "NO_ROUTE"
+        self.resource_accepted = False
+        self.comparison = {}
+        self.comparison_candidates = []
+        self.status_message = message
+        self.status_color = AMBER
+
+    def toggle_checkpoint_mode(self) -> None:
+        self.set_explorer_mode("free" if self.explorer_mode == "full_race" else "full_race")
+
     def switch_circuit(self, delta: int) -> None:
         if self.session.mode == "championship":
             self.status_message = "Championship order locks circuit switching for the scheduled race."
@@ -768,13 +953,14 @@ class TrackExplorerView(ArcadeView):
         self.session.selected_track_id = self.session.tracks[self.track_index].id
         self.session.save_state()
         self.load_track()
+        self.status_message = f"Loaded {self.track.name}. Previous route and resource decisions were cleared."
+        self.status_color = CYAN
         self.rebuild_ui()
 
     def set_algorithm(self, algorithm: str) -> None:
         self.algorithm = algorithm
         self.session.selected_algorithm = algorithm
-        self.route_result = None
-        self.comparison = {}
+        self._mark_route_stale(f"{algorithm} selected. Calculate to produce a fresh result.")
         self.status_message = f"{algorithm} selected. {ALGORITHM_COMPLEXITY[algorithm]}"
         self.status_color = CYAN
         self.rebuild_ui()
@@ -783,35 +969,48 @@ class TrackExplorerView(ArcadeView):
     def planner_algorithm(self) -> str:
         return "astar" if self.algorithm == "A*" else self.algorithm.lower()
 
+    def comparison_modal_geometry(self) -> tuple[float, float, float, float]:
+        """Return the larger, symmetric comparison modal rectangle."""
+        width, height = self.window.width, self.window.height
+        panel_width = min(1040, int(width * 0.86))
+        panel_height = min(560, int(height * 0.82))
+        left = (width - panel_width) / 2
+        bottom = max(70, (height - panel_height) / 2)
+        return left, bottom, panel_width, panel_height
+
+    def comparison_card_rect(self, index: int) -> tuple[float, float, float, float]:
+        left, bottom, width, height = self.comparison_modal_geometry()
+        card_height = 72
+        card_gap = 9
+        card_bottom = bottom + height - 150 - index * (card_height + card_gap)
+        return left + 24, card_bottom, width - 48, card_height
+
     def set_preset(self, preset: str) -> None:
         if self.algorithm not in {"Dijkstra", "A*"}:
             self.status_message = "Weighted presets are not applicable to BFS or DFS."
             self.status_color = AMBER
             return
         self.preset = preset
-        self.route_result = None
-        self.comparison = {}
+        self.comparison_selected_preset = preset
+        self._mark_route_stale(f"{preset.title()} preset selected; calculate to recompute the weighted route.")
         self.status_message = f"{preset.title()} preset selected; calculate to recompute the weighted route."
         self.status_color = CYAN
         self.rebuild_ui()
 
     def set_selection_mode(self, mode: str) -> None:
+        if self.explorer_mode != "free":
+            self.status_message = "Source and destination are fixed in Full Race Plan mode; use the checkpoint sequence."
+            self.status_color = AMBER
+            return
         self.selection_mode = mode
         self.status_message = f"Click a vertex on the map to choose the {mode}."
         self.status_color = CYAN
         self.rebuild_ui()
 
-    def toggle_checkpoint_mode(self) -> None:
-        self.checkpoint_aware = not self.checkpoint_aware
-        self.route_result = None
-        self.comparison = {}
-        self.status_message = "Checkpoint-aware routing is " + ("enabled." if self.checkpoint_aware else "disabled; race start will be rejected.")
-        self.status_color = AMBER if not self.checkpoint_aware else CYAN
-        self.rebuild_ui()
-
     def calculate_route(self) -> None:
         if not self.validation.valid:
             self.route_result = None
+            self.route_state = "ROUTE_INVALID"
             self.status_message = "Cannot calculate: " + self.validation.errors[0]
             self.status_color = CORAL
             return
@@ -823,7 +1022,7 @@ class TrackExplorerView(ArcadeView):
                 self.source_id,
                 self.destination_id,
                 algorithm=self.planner_algorithm,
-                checkpoint_aware=self.checkpoint_aware,
+                checkpoint_aware=self.explorer_mode == "full_race",
             )
         except (KeyError, ValueError) as exc:
             result = None
@@ -831,6 +1030,7 @@ class TrackExplorerView(ArcadeView):
             self.status_color = CORAL
         self.route_result = result
         if result is None or not result.get("metrics", {}).get("valid"):
+            self.route_state = "ROUTE_INVALID"
             self.status_message = "Destination is unreachable under the current directed/open-road graph."
             self.status_color = CORAL
             self.comparison = {}
@@ -838,61 +1038,113 @@ class TrackExplorerView(ArcadeView):
         self.status_message = "Route calculated from the authoritative graph."
         self.status_color = EMERALD
         self.comparison = {}
+        self.comparison_candidates = []
+        self.route_revision = self.graph_revision
+        self.resource_accepted = False
+        self.route_state = "PLAN_FEASIBLE" if self.explorer_mode == "full_race" and result.get("resources", {}).get("fuel_feasible") else ("PLAN_INFEASIBLE" if self.explorer_mode == "full_race" else "ROUTE_READY")
         self.rebuild_ui()
 
     def plan_resources(self) -> None:
-        self.calculate_route()
+        if self.route_result is None or self.route_revision != self.graph_revision or self.route_state in {"ROUTE_STALE", "ROUTE_INVALID"}:
+            self.calculate_route()
         if self.route_result:
             resources = self.route_result.get("resources", {})
             stops = len(resources.get("required_refuelling_stops", []))
             nitro_ready = bool(resources.get("nitro", {}).get("dp"))
-            self.status_message = f"Resource plan ready: fuel {'feasible' if resources.get('fuel_feasible') else 'infeasible'}, {stops} refuel stop(s), nitro {'available' if nitro_ready else 'unavailable'}."
+            self.modal = "resources"
+            self.status_message = f"Resource plan: fuel {'feasible' if resources.get('fuel_feasible') else 'infeasible'}, {stops} refuel stop(s), nitro {'available' if nitro_ready else 'unavailable'}."
             self.status_color = EMERALD if resources.get("fuel_feasible") else CORAL
             self.rebuild_ui()
 
+    def accept_resource_plan(self) -> None:
+        if not self.route_result:
+            return
+        resources = self.route_result.get("resources", {})
+        self.resource_accepted = bool(resources.get("fuel_feasible"))
+        self.route_state = "PLAN_FEASIBLE" if self.resource_accepted else "PLAN_INFEASIBLE"
+        self.status_message = "Resource plan accepted; review the race plan before starting." if self.resource_accepted else "Resource plan is infeasible; choose a route with reachable refuelling."
+        self.status_color = EMERALD if self.resource_accepted else CORAL
+        self.close_modal()
+
     def compare_routes(self) -> None:
-        if self.route_result is None:
+        if self.route_result is None or self.route_revision != self.graph_revision or self.route_state in {"ROUTE_STALE", "ROUTE_INVALID"}:
             self.calculate_route()
         if self.route_result is None:
             return
         planner = RoutePlanner(self.track, self.preset if self.algorithm in {"Dijkstra", "A*"} else "balanced")
         planner.graph = self.graph
-        if self.algorithm in {"Dijkstra", "A*"}:
-            self.comparison = planner.compare_presets(
-                self.source_id,
-                self.destination_id,
-                self.planner_algorithm,
-                checkpoint_aware=self.checkpoint_aware,
-            )
-        else:
-            weighted = planner.plan_route(
-                self.source_id,
-                self.destination_id,
-                algorithm="dijkstra",
-                checkpoint_aware=self.checkpoint_aware,
-            )
-            self.comparison = {"selected": self.route_result, "Dijkstra balanced": weighted}
-        self.status_message = f"Compared {len([item for item in self.comparison.values() if item])} valid route candidates."
+        # Comparison is intentionally always weighted: BFS/DFS remain useful
+        # for traversal education, while the four route cards answer the
+        # assignment's actual multi-objective planning question.
+        weighted_algorithm = self.planner_algorithm if self.algorithm in {"Dijkstra", "A*"} else "dijkstra"
+        self.comparison = planner.compare_presets(
+            self.source_id,
+            self.destination_id,
+            weighted_algorithm,
+            checkpoint_aware=self.explorer_mode == "full_race",
+        )
+        self.comparison_selected_preset = self.preset if self.algorithm in {"Dijkstra", "A*"} else "balanced"
+        self.comparison_candidates = [
+            (f"{preset.title()} Route", self.comparison.get(preset))
+            for preset in self.PRESETS
+        ]
+        self.modal = "comparison"
+        self.status_message = "Compared four weighted route candidates: Balanced, Speed, Economy, and Safety."
         self.status_color = CYAN
+        self.rebuild_ui()
+
+    def select_comparison(self, index: int) -> None:
+        if index >= len(self.comparison_candidates):
+            return
+        label, report = self.comparison_candidates[index]
+        if not report or not report.get("path"):
+            self.status_message = f"{label} is unavailable under the current road state."
+            self.status_color = CORAL
+            return
+        self.route_result = report
+        selected_preset = str(report.get("preset", label.split()[0].lower()))
+        if selected_preset in self.PRESETS:
+            self.preset = selected_preset
+            self.comparison_selected_preset = selected_preset
+        if report.get("algorithm") in {"dijkstra", "astar"}:
+            self.algorithm = "A*" if report["algorithm"] == "astar" else "Dijkstra"
+            self.session.selected_algorithm = self.algorithm
+        self.route_revision = self.graph_revision
+        self.resource_accepted = False
+        self.route_state = "PLAN_FEASIBLE" if self.explorer_mode == "full_race" and report.get("resources", {}).get("fuel_feasible") else ("PLAN_INFEASIBLE" if self.explorer_mode == "full_race" else "ROUTE_READY")
+        self.status_message = f"Selected {label}; route overlay and metrics updated."
+        self.status_color = EMERALD
+        self.close_modal()
 
     def start_race(self) -> None:
         if not self.validation.valid:
             self.status_message = "Race blocked: circuit validation failed."
             self.status_color = CORAL
             return
-        if not self.checkpoint_aware:
-            self.status_message = "Race blocked: enable checkpoint-aware routing first."
+        if self.explorer_mode != "full_race":
+            self.status_message = "Race blocked: switch to Full Race Plan; free exploration is not a race plan."
             self.status_color = CORAL
             return
         if self.source_id != self.track.start_id:
             self.status_message = "Race blocked: source must be the circuit start vertex."
             self.status_color = CORAL
             return
-        if self.route_result is None:
+        if self.route_result is None or self.route_revision != self.graph_revision or self.route_state in {"ROUTE_STALE", "ROUTE_INVALID"}:
             self.calculate_route()
         if not self.route_result or not self.route_result.get("resources", {}).get("fuel_feasible", False):
-            self.status_message = "Race blocked: route has no feasible fuel plan."
+            self.status_message = "Race blocked: route has no feasible fuel plan. Open Plan Resources for details."
             self.status_color = CORAL
+            return
+        if not self.resource_accepted:
+            self.modal = "start_confirm"
+            self.status_message = "Review the validated plan, then confirm the race start."
+            self.status_color = CYAN
+            self.rebuild_ui()
+            return
+        self.confirm_start_race()
+
+    def confirm_start_race(self) -> None:
+        if not self.route_result:
             return
         metrics = self.route_result["metrics"]
         resources = self.route_result.get("resources", {})
@@ -903,33 +1155,72 @@ class TrackExplorerView(ArcadeView):
                 "preset": self.preset if self.algorithm in {"Dijkstra", "A*"} else None,
                 "source": self.source_id,
                 "destination": self.destination_id,
-                "checkpoint_aware": self.checkpoint_aware,
+                "checkpoint_aware": self.explorer_mode == "full_race",
                 "path": list(self.route_result["path"]),
                 "edge_ids": list(metrics.get("edge_ids", [])),
                 "metrics": {key: value for key, value in metrics.items() if isinstance(value, (bool, int, float, str))},
                 "fuel_feasible": bool(resources.get("fuel_feasible", False)),
                 "required_refuelling_stops": resources.get("required_refuelling_stops", []),
+                "resources": resources,
+                "resource_accepted": True,
             }
         )
+        self.modal = None
         self.app.show_view(ArcadeRacingView(self.app, self.session))
 
     def toggle_closure(self) -> None:
-        edge_ids = self.route_result.get("metrics", {}).get("edge_ids", []) if self.route_result else []
-        edge_id = edge_ids[0] if edge_ids else next(iter(self.graph.edges), None)
-        if edge_id is None:
+        self.open_event_modal()
+
+    def apply_event(self, status: EdgeStatus) -> None:
+        if self.event_edge_id not in self.graph.edges:
+            self.status_message = "Select a road on the map before applying a preview event."
+            self.status_color = CORAL
             return
-        edge = self.graph.edges[edge_id]
-        edge.status = EdgeStatus.OPEN if edge.status == EdgeStatus.BLOCKED else EdgeStatus.BLOCKED
-        self.status_message = f"Road {edge_id} is now {edge.status.value}; routes must be recalculated."
-        self.status_color = CORAL if edge.status == EdgeStatus.BLOCKED else AMBER
+        edge = self.graph.edges[self.event_edge_id]
+        if edge.status == status:
+            self.status_message = f"Road {edge.id} is already {status.value}; no preview change was recorded."
+            self.status_color = MUTED
+            return
+        self.event_history.append((edge.id, edge.status))
+        edge.status = status
+        self.graph_revision += 1
+        self._mark_route_stale(f"Preview event applied to road {edge.id}: {status.value}. Recalculate to update the route.")
+        self.status_color = CORAL if status == EdgeStatus.BLOCKED else AMBER
+        self.rebuild_ui()
+
+    def undo_event(self) -> None:
+        if not self.event_history:
+            self.status_message = "No preview road event is available to undo."
+            self.status_color = MUTED
+            return
+        edge_id, old_status = self.event_history.pop()
+        self.graph.edges[edge_id].status = old_status
+        self.graph_revision += 1
+        self._mark_route_stale(f"Undid the preview event on road {edge_id}; recalculate when ready.")
+        self.rebuild_ui()
+
+    def reset_events(self) -> None:
+        for edge_id, status in self.event_base_status.items():
+            self.graph.edges[edge_id].status = status
+        self.event_history = []
+        self.graph_revision += 1
+        self._mark_route_stale("All temporary road events were reset; the canonical circuit was not changed.")
+        self.rebuild_ui()
+
+    def recalculate_from_event_modal(self) -> None:
+        self.modal = None
         self.calculate_route()
 
     def on_key_press(self, symbol: int, modifiers: int):
+        if self.modal:
+            if symbol == arcade.key.ESCAPE:
+                self.close_modal()
+            return
         if symbol == arcade.key.ESCAPE:
             self.go_menu()
-        elif symbol == arcade.key.S:
+        elif symbol == arcade.key.S and self.explorer_mode == "free":
             self.set_selection_mode("source")
-        elif symbol == arcade.key.D:
+        elif symbol == arcade.key.D and self.explorer_mode == "free":
             self.set_selection_mode("destination")
         elif symbol in (arcade.key.PLUS, arcade.key.NUM_ADD, arcade.key.EQUAL):
             self.zoom = min(2.5, self.zoom * 1.12)
@@ -949,15 +1240,37 @@ class TrackExplorerView(ArcadeView):
         if button != arcade.MOUSE_BUTTON_LEFT:
             return
         if self.map_contains(x, y):
+            if self.modal == "events":
+                edge_id = self.nearest_edge(x, y)
+                if edge_id is not None:
+                    self.event_edge_id = edge_id
+                    self.status_message = f"Road {edge_id} selected for preview event."
+                    self.status_color = CYAN
+                    self.rebuild_ui()
+                return
             vertex_id = self.nearest_vertex(x, y)
             if vertex_id is not None:
                 self.selected_vertex_id = vertex_id
-                if self.selection_mode == "source":
+                if self.explorer_mode == "free" and self.selection_mode == "source":
                     self.source_id = vertex_id
-                else:
+                    self._mark_route_stale(f"Source set to vertex {vertex_id}; calculate to update the exploration result.")
+                elif self.explorer_mode == "free" and self.selection_mode == "destination":
                     self.destination_id = vertex_id
-                self.status_message = f"{self.selection_mode.title()} set to vertex {vertex_id}; calculate to update the route."
+                    self._mark_route_stale(f"Destination set to vertex {vertex_id}; calculate to update the exploration result.")
+                else:
+                    self.status_message = f"Inspected vertex {vertex_id}; see the inspection card for graph details."
+                    self.status_color = CYAN
+                self.inspection_active = True
+                self.inspected_edge_id = None
+                self.rebuild_ui()
+                return
+            edge_id = self.nearest_edge(x, y)
+            if edge_id is not None:
+                self.inspected_edge_id = edge_id
+                self.inspection_active = True
+                self.status_message = f"Inspected road {edge_id}; see the inspection card for details."
                 self.status_color = CYAN
+                self.rebuild_ui()
                 return
             self.drag_anchor = (x, y)
             self.dragged = False
@@ -1072,13 +1385,23 @@ class TrackExplorerView(ArcadeView):
         arcade.draw_lbwh_rectangle_filled(0, 0, width, height, NAVY)
         arcade.draw_lbwh_rectangle_filled(0, height - 74, width, 74, (14, 27, 46))
         arcade.draw_line(0, height - 74, width, height - 74, CYAN, 2)
-        title_center = max(650, width * 0.50)
+        # Keep the title in the clear space between the navigation controls
+        # and the right-aligned session indicator on narrow windows.
+        title_center = (max(520, width * 0.28) + width - 140) / 2
         _text("TRACK EXPLORER", title_center, height - 39, 24, WHITE, anchor_x="center", anchor_y="center", bold=True)
         _text(self.track.name, title_center, height - 61, 11, CYAN, anchor_x="center", anchor_y="center")
         _text(f"MODE  {self.session.mode.upper()}", width - 24, height - 38, 12, MUTED, anchor_x="right", anchor_y="center")
         self.draw_map()
+        self.draw_inspection_card()
         self.draw_side_panel()
         self.draw_legend()
+        for index, (button, _rect, _callback) in enumerate(self.buttons):
+            # Modal controls are kept in the same UI manager for input
+            # handling, but the underlying planner controls must not paint
+            # through the modal overlay.
+            button.visible = not self.modal or index >= self.base_button_count
+        if self.modal:
+            self.draw_explorer_modal()
         self.ui.draw()
         self.draw_focus()
         self.draw_tooltip()
@@ -1111,6 +1434,11 @@ class TrackExplorerView(ArcadeView):
                 mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
                 arcade.draw_line(mx - 9, my - 9, mx + 9, my + 9, CORAL, 3)
                 arcade.draw_line(mx - 9, my + 9, mx + 9, my - 9, CORAL, 3)
+        for edge_id, color in ((self.inspected_edge_id, AMBER), (self.event_edge_id if self.modal == "events" else None, CORAL)):
+            if edge_id in self.graph.edges:
+                edge = self.graph.edges[edge_id]
+                source, target = self.graph.vertices[edge.from_id], self.graph.vertices[edge.to_id]
+                arcade.draw_line(*self.world_to_screen(source.x, source.y), *self.world_to_screen(target.x, target.y), color, 20)
         comparison_paths = []
         colors = [AMBER, PURPLE, (244, 114, 182), (134, 239, 172)]
         for index, report in enumerate(self.comparison.values()):
@@ -1122,6 +1450,154 @@ class TrackExplorerView(ArcadeView):
             self.draw_path(self.route_result["path"], CYAN, 10, True)
         for vertex in self.graph.vertices.values():
             self.draw_vertex(vertex)
+
+    def draw_inspection_card(self) -> None:
+        if not self.inspection_active:
+            return
+        left, bottom, _width, height = self.map_rect
+        card_width, card_height = min(390, self.map_rect[2] - 32), 74
+        card_left = left + 12
+        card_bottom = bottom + height - card_height - 12
+        arcade.draw_lbwh_rectangle_filled(card_left, card_bottom, card_width, card_height, (5, 15, 27, 235))
+        arcade.draw_lbwh_rectangle_outline(card_left, card_bottom, card_width, card_height, CYAN, 1)
+        if self.inspected_edge_id in self.graph.edges:
+            edge = self.graph.edges[self.inspected_edge_id]
+            title = f"ROAD E{edge.id}  V{edge.from_id} → V{edge.to_id}  {edge.status.value}"
+            detail = f"{edge.distance:.1f}m  time {edge.effective_time():.1f}s  fuel {edge.effective_fuel():.1f}  difficulty {edge.effective_difficulty()}  {'shortcut' if edge.is_shortcut else 'main road'}"
+        elif self.selected_vertex_id in self.graph.vertices:
+            vertex = self.graph.vertices[self.selected_vertex_id]
+            adjacent = ", ".join(f"E{edge.id}" for _, edge in self.graph.neighbors(vertex.id)) or "none"
+            title = f"VERTEX V{vertex.id}  {vertex.type.value}  CP{vertex.checkpoint_order or '—'}"
+            detail = f"Adjacent roads: {adjacent}"
+        else:
+            return
+        _text(title, card_left + 10, card_bottom + card_height - 22, 11, WHITE, bold=True)
+        _text(detail, card_left + 10, card_bottom + 18, 10, CYAN, width=card_width - 20)
+
+    def draw_explorer_modal(self) -> None:
+        width, height = self.window.width, self.window.height
+        if self.modal == "comparison":
+            left, bottom, panel_width, panel_height = self.comparison_modal_geometry()
+        else:
+            panel_width = min(1040, int(width * 0.78))
+            panel_height = min(430, int(height * 0.60))
+            left = (width - panel_width) / 2
+            bottom = max(170, (height - panel_height) / 2)
+        arcade.draw_lbwh_rectangle_filled(0, 0, width, height, (3, 9, 18, 185))
+        self.draw_panel(left, bottom, panel_width, panel_height, 250)
+        titles = {
+            "comparison": "ROUTE COMPARISON",
+            "resources": "RESOURCE PLANNER",
+            "events": "TEMPORARY ROAD EVENT PREVIEW",
+            "checkpoint": "FULL RACE CHECKPOINT SEQUENCE",
+            "start_confirm": "CONFIRM RACE PLAN",
+        }
+        _text(titles.get(self.modal, "TRACK EXPLORER"), left + 24, bottom + panel_height - 38, 22, WHITE, bold=True)
+        if self.modal == "comparison":
+            _text("Four weighted candidates share the same graph. Select one to update the route overlay.", left + 24, bottom + panel_height - 68, 12, MUTED, width=panel_width - 48)
+            for index, (label, report) in enumerate(self.comparison_candidates[:4]):
+                card_left, card_bottom, card_width, card_height = self.comparison_card_rect(index)
+                metrics = (report or {}).get("metrics", {})
+                resources = (report or {}).get("resources", {}) or {}
+                preset = (report or {}).get("preset", label.split()[0].lower())
+                selected = preset == self.comparison_selected_preset
+                valid = bool(metrics.get("valid")) and bool(resources.get("fuel_feasible", True))
+                border = CYAN if selected else ((45, 212, 160) if valid else CORAL)
+                arcade.draw_lbwh_rectangle_filled(card_left, card_bottom, card_width, card_height, (7, 15, 27, 245))
+                arcade.draw_lbwh_rectangle_outline(card_left, card_bottom, card_width, card_height, border, 2 if selected else 1)
+                radio_color = CYAN if selected else (190, 198, 207)
+                arcade.draw_circle_filled(card_left + 22, card_bottom + card_height - 22, 8, radio_color)
+                if selected:
+                    arcade.draw_circle_outline(card_left + 22, card_bottom + card_height - 22, 12, CYAN, 2)
+                _text(label, card_left + 40, card_bottom + card_height - 27, 15, WHITE, bold=True)
+                columns = [
+                    ("TIME", f"{metrics.get('travel_time', 0):.1f} s"),
+                    ("DISTANCE", f"{metrics.get('distance', 0):.1f} m"),
+                    ("FUEL", f"{metrics.get('fuel', 0):.1f} units"),
+                    ("COST", f"{metrics.get('weighted_cost', 0):.3f}"),
+                    ("VALID", "YES" if valid else "NO"),
+                ]
+                for column, (caption, value) in enumerate(columns):
+                    x = card_left + 54 + column * (card_width - 72) / 5
+                    _text(caption, x, card_bottom + 25, 9, MUTED, bold=True)
+                    _text(value, x, card_bottom + 9, 11, EMERALD if caption == "VALID" and valid else (CORAL if caption == "VALID" else WHITE), bold=True)
+            selected_label = next((label for label, report in self.comparison_candidates if (report or {}).get("preset", label.split()[0].lower()) == self.comparison_selected_preset), "No route")
+            _text(f"{selected_label} selected", left + 24, bottom + 92, 13, CYAN, bold=True)
+            _text("Selection updates the active map overlay and race-plan candidate.", left + 24, bottom + 72, 11, MUTED)
+        elif self.modal == "resources":
+            resources = self.route_result.get("resources", {}) if self.route_result else {}
+            fuel = resources.get("fuel")
+            nitro = resources.get("nitro", {})
+            route_demand = self.route_result.get("metrics", {}).get("fuel", 0) if self.route_result else 0
+            stops = resources.get("required_refuelling_stops", [])
+            stop_line = "Stops: " + ", ".join(f"V{stop['vertex_id']} +{stop['buy']:.1f}" for stop in stops) if stops else "Stops: none required"
+            lines = [
+                (f"Starting fuel: 100.0   Capacity: 100.0   Route demand: {route_demand:.1f}", WHITE),
+                (f"STATUS: {'FEASIBLE' if resources.get('fuel_feasible') else 'INFEASIBLE'}", EMERALD if resources.get("fuel_feasible") else CORAL),
+                (f"Required refuelling stops: {len(stops)}", CYAN),
+                (stop_line, MUTED),
+                (f"DP fuel states: {getattr(fuel, 'states', 'Not recorded')}", MUTED),
+                (f"Nitro pickups on route: {len(nitro.get('items', []))} / budget {nitro.get('budget', 3)}", PURPLE),
+                (f"Nitro DP recommendation: {getattr(nitro.get('dp'), 'selected', 'none')}", PURPLE),
+                (f"Greedy recommendation: {getattr(nitro.get('greedy'), 'selected', 'none')}", MUTED),
+            ]
+            for index, (line, color) in enumerate(lines):
+                _text(line, left + 24, bottom + panel_height - 96 - index * 28, 12, color, width=panel_width - 48)
+            _text("Accepting stores the resource decision in the current planning session; race rules remain authoritative.", left + 24, bottom + 62, 11, MUTED, width=panel_width - 48)
+        elif self.modal == "events":
+            selected = self.event_edge_id
+            if selected in self.graph.edges:
+                edge = self.graph.edges[selected]
+                source, target = self.graph.vertices[edge.from_id], self.graph.vertices[edge.to_id]
+                on_route = bool(self.route_result and edge.id in self.route_result.get("metrics", {}).get("edge_ids", []))
+                status_color = {
+                    EdgeStatus.OPEN: EMERALD,
+                    EdgeStatus.RESTRICTED: AMBER,
+                    EdgeStatus.BLOCKED: CORAL,
+                }.get(edge.status, MUTED)
+                _text("SELECTED ROAD", left + 24, bottom + panel_height - 92, 10, CYAN, bold=True)
+                _text(f"E{edge.id}   V{edge.from_id} → V{edge.to_id}", left + 24, bottom + panel_height - 118, 16, WHITE, bold=True)
+                _text(f"{'ONE-WAY' if edge.directed else 'TWO-WAY'}   {edge.distance:.1f} m   {edge.effective_time():.1f} s   fuel {edge.effective_fuel():.1f}", left + 24, bottom + panel_height - 145, 12, MUTED)
+                _text(f"Current status: {edge.status.value.upper()}", left + 24, bottom + panel_height - 173, 12, status_color, bold=True)
+                _text(f"Shortcut: {'YES' if edge.is_shortcut else 'NO'}   On active route: {'YES' if on_route else 'NO'}", left + 24, bottom + panel_height - 199, 12, MUTED)
+                _text(f"Geometry: ({source.x:.0f}, {source.y:.0f}) → ({target.x:.0f}, {target.y:.0f})", left + 24, bottom + panel_height - 225, 11, MUTED)
+            else:
+                _text("No road selected", left + 24, bottom + panel_height - 112, 16, AMBER, bold=True)
+                _text("Click any road on the map to select it for a temporary event.", left + 24, bottom + panel_height - 142, 12, MUTED)
+            right = left + panel_width * 0.56
+            _text("EVENT WORKFLOW", right, bottom + panel_height - 92, 10, CYAN, bold=True)
+            workflow = [
+                "1  Click a road on the map",
+                "2  Close, reopen, or restrict it",
+                "3  Recalculate to refresh the route",
+            ]
+            for index, line in enumerate(workflow):
+                _text(line, right, bottom + panel_height - 121 - index * 25, 12, WHITE)
+            _text("PREVIEW STATE", right, bottom + panel_height - 211, 10, CYAN, bold=True)
+            _text(f"Temporary changes: {len(self.event_history)}", right, bottom + panel_height - 237, 12, MUTED)
+            _text(f"Graph revision: {self.graph_revision}", right, bottom + panel_height - 262, 12, MUTED)
+            _text(f"Route status: {self.route_state.replace('_', ' ')}", right, bottom + panel_height - 287, 12, self.status_color)
+            _text("Explorer-only copy; the canonical track and active race remain unchanged.", left + 24, bottom + 106, 11, MUTED, width=panel_width - 48)
+        elif self.modal == "checkpoint":
+            _text("Full Race Plan requires this ordered sequence on every lap:", left + 24, bottom + panel_height - 92, 14, CYAN)
+            sequence = "START  →  " + "  →  ".join(f"CP{self.track.vertices[next(i for i, vertex in enumerate(self.track.vertices) if vertex.id == checkpoint)].checkpoint_order}" for checkpoint in self.track.checkpoint_ids) + "  →  FINISH"
+            _text(sequence, left + 24, bottom + panel_height - 138, 12, WHITE, width=panel_width - 48)
+            _text(f"Mandatory checkpoints: {len(self.track.checkpoint_ids)}   Lap boundary: {self.track.finish_id}   Route status: {self.route_state.replace('_', ' ')}", left + 24, bottom + panel_height - 182, 12, MUTED)
+            _text("Free Exploration is for graph study only and cannot be transferred into a race.", left + 24, bottom + 72, 12, AMBER, width=panel_width - 48)
+        elif self.modal == "start_confirm":
+            metrics = self.route_result.get("metrics", {}) if self.route_result else {}
+            resources = self.route_result.get("resources", {}) if self.route_result else {}
+            lines = [
+                f"Circuit: {self.track.name}",
+                f"Mode: FULL RACE PLAN   Algorithm: {self.algorithm}   Preset: {self.preset.title() if self.algorithm in {'Dijkstra', 'A*'} else 'Not applicable'}",
+                f"Route: {len(self.route_result.get('path', [])) if self.route_result else 0} vertices / {len(metrics.get('edge_ids', []))} roads",
+                f"Distance: {metrics.get('distance', 0):.1f}   Time: {metrics.get('travel_time', 0):.1f}s   Fuel: {metrics.get('fuel', 0):.1f}",
+                f"Refuel stops: {len(resources.get('required_refuelling_stops', []))}   Nitro DP: {'ready' if resources.get('nitro', {}).get('dp') else 'none'}",
+                f"Checkpoint order: VALID   Fuel feasibility: {'VALID' if resources.get('fuel_feasible') else 'INVALID'}",
+            ]
+            for index, line in enumerate(lines):
+                _text(line, left + 24, bottom + panel_height - 92 - index * 30, 12, EMERALD if index == 5 and resources.get("fuel_feasible") else WHITE)
+            _text("Confirm only when the displayed plan matches the strategy you want to race.", left + 24, bottom + 72, 11, MUTED)
 
     def draw_environment(self) -> None:
         left, bottom, width, height = self.map_rect
@@ -1165,6 +1641,8 @@ class TrackExplorerView(ArcadeView):
 
     def draw_vertex(self, vertex) -> None:
         px, py = self.world_to_screen(vertex.x, vertex.y)
+        if vertex.id == self.selected_vertex_id:
+            arcade.draw_circle_outline(px, py, 24, WHITE, 2)
         if vertex.id == self.source_id:
             arcade.draw_circle_outline(px, py, 18, EMERALD, 3)
         if vertex.id == self.destination_id:
@@ -1203,14 +1681,19 @@ class TrackExplorerView(ArcadeView):
         _text("ROUTE PLANNER", left + 14, bottom + height - 28, 17, WHITE, bold=True)
         _text("Click the map to select vertices", left + 14, bottom + height - 48, 11, MUTED)
         body_top = bottom + height - 410 - self.panel_scroll
-        reachable, dead_ends, cycle, alternatives = self.graph_summary()
+        reachable, dead_ends, cycle, _alternatives = self.graph_summary()
         lines = [
-            ("VALIDATION", self.status_color, True),
-            ("Graph valid" if self.validation.valid else "Graph invalid", EMERALD if self.validation.valid else CORAL, False),
+            ("GRAPH VALIDATION", self.status_color, True),
+            ("Circuit valid" if self.validation.valid else "Circuit invalid", EMERALD if self.validation.valid else CORAL, False),
             (f"Reachable vertices: {reachable}/{len(self.graph.vertices)}", MUTED, False),
             (f"Cycle: {'yes' if cycle else 'no'}   Dead ends: {dead_ends}", MUTED, False),
-            (f"Alternative candidates: {alternatives}", MUTED, False),
+            (f"Shortcuts: {sum(1 for edge in self.graph.edges.values() if edge.is_shortcut) // 2}", MUTED, False),
+            (f"Services: {sum(1 for vertex in self.graph.vertices.values() if vertex.type in {VertexType.FUEL_STATION, VertexType.NITRO_PICKUP})} reachable", MUTED, False),
+            (f"Geometry: {'valid' if self.geometry and self.geometry.valid else 'invalid'} / {len(self.geometry.warnings) if self.geometry else 0} warnings", EMERALD if self.geometry and self.geometry.valid else CORAL, False),
+            ("ROUTE VALIDATION", WHITE, True),
+            (f"Mode: {'FULL RACE PLAN' if self.explorer_mode == 'full_race' else 'FREE EXPLORATION'}", CYAN, False),
             (f"Source: {self.source_id}   Destination: {self.destination_id}", WHITE, False),
+            (f"Route status: {self.route_state.replace('_', ' ')}", self.status_color, False),
             (self.status_message, self.status_color, False),
         ]
         wrapped_lines = []
@@ -1221,7 +1704,7 @@ class TrackExplorerView(ArcadeView):
         for index, (line, color, heading) in enumerate(wrapped_lines):
             y = body_top - index * 20
             if bottom + 62 < y < bottom + height - 285:
-                _text(line, left + 14, y, 12 if not heading else 13, color, bold=heading)
+                _text(line, left + 14, y, 12 if not heading else 13, color, bold=heading, width=width - 28)
         if self.route_result:
             metrics = self.route_result.get("metrics", {})
             counters = self.route_result.get("counters")
@@ -1232,7 +1715,7 @@ class TrackExplorerView(ArcadeView):
                 (f"Distance: {metrics.get('distance', 0):.1f}", WHITE, False),
                 (f"Travel time: {metrics.get('travel_time', 0):.1f}s", WHITE, False),
                 (f"Fuel demand: {metrics.get('fuel', 0):.1f}", WHITE, False),
-                (f"Weighted cost: {metrics.get('weighted_cost', 0):.3f}", CYAN, False),
+                (f"Weighted cost: {'Not optimized (BFS/DFS)' if self.algorithm in {'BFS', 'DFS'} else f'{metrics.get('weighted_cost', 0):.3f}'}", CYAN, False),
                 (f"Risk/difficulty: {metrics.get('risk', 0):.1f}", MUTED, False),
                 (f"Visited: {getattr(counters, 'visited_vertices', 0)}  Expanded: {getattr(counters, 'expanded_vertices', 0)}", MUTED, False),
                 (f"Edges examined: {getattr(counters, 'examined_edges', 0)}  Relaxed: {getattr(counters, 'relaxed_edges', 0)}", MUTED, False),
@@ -1256,11 +1739,11 @@ class TrackExplorerView(ArcadeView):
             for index, (line, color, heading) in enumerate(route_wrapped, start=route_start + 1):
                 y = body_top - index * 20
                 if bottom + 62 < y < bottom + height - 285:
-                    _text(line, left + 14, y, 12 if not heading else 13, color, bold=heading)
+                    _text(line, left + 14, y, 12 if not heading else 13, color, bold=heading, width=width - 28)
         if self.comparison:
             compare_y = bottom + 52
             _text("COMPARISON", left + 14, compare_y + 16, 12, WHITE, bold=True)
-            labels = list(self.comparison.items())[:4]
+            labels = self.comparison_candidates[:4]
             for index, (label, report) in enumerate(labels):
                 if report is None:
                     continue
@@ -1275,7 +1758,7 @@ class TrackExplorerView(ArcadeView):
             arcade.draw_circle_filled(x, y + 3, 5, color)
             _text(label, x + 10, y, 10, MUTED)
             x += 75 if label != "SHORTCUT" else 92
-        _text("Wheel: zoom/panel scroll   Drag: pan   S/D: select source/destination", map_width - 8, y, 10, MUTED, anchor_x="right")
+        _text("Wheel: zoom/panel scroll   Drag: pan   S/D: select source/destination", self.window.width - 18, y, 10, MUTED, anchor_x="right")
 
     def draw_tooltip(self) -> None:
         vertex_id = self.hover_vertex_id

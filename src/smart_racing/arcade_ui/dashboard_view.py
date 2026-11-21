@@ -83,6 +83,9 @@ class ChampionshipDashboardView(ArcadeView):
             return
         self.session.selected_track_id = self.session.tracks[self.session.championship_index].id
         self.session.route_plan = None
+        self.session.explorer_mode = "full_race"
+        self.session.explorer_return = "dashboard"
+        self.session.explorer_context = {}
         self.session.save_state()
         from smart_racing.arcade_ui.app import TrackExplorerView
 

@@ -48,7 +48,8 @@ class AlgorithmLabView(ArcadeView):
     """Actual step-through lab backed by the same algorithm modules used by gameplay."""
 
     def __init__(self, window, session):
-        self.selected = 0
+        selected_name = session.selected_algorithm
+        self.selected = next((index for index, item in enumerate(CATALOG) if item[0] == selected_name), 0)
         self.steps = []
         self.step_index = 0
         self.result = None
@@ -87,7 +88,7 @@ class AlgorithmLabView(ArcadeView):
     def go_back(self) -> None:
         from smart_racing.arcade_ui.app import MainMenuView, TrackExplorerView
 
-        if self.session.mode in {"quick", "explore", "championship"} and self.session.route_plan:
+        if self.session.explorer_return == "explorer":
             self.app.show_view(TrackExplorerView(self.app, self.session))
         else:
             self.app.show_view(MainMenuView(self.app, self.session))

@@ -38,6 +38,9 @@ class GameSession:
     race_history: list[dict[str, Any]] = field(default_factory=list)
     championship_entries: dict[str, dict[str, Any]] = field(default_factory=dict)
     last_results: list[dict[str, Any]] = field(default_factory=list)
+    explorer_mode: str = "full_race"
+    explorer_return: str = "menu"
+    explorer_context: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def create(cls, tracks: list[Any], root: Path | None = None) -> "GameSession":
@@ -83,6 +86,9 @@ class GameSession:
                         if isinstance(value, dict)
                     }
                     self.last_results = [dict(item) for item in stored.get("last_results", []) if isinstance(item, dict)]
+                    self.explorer_mode = str(stored.get("explorer_mode", self.explorer_mode))
+                    self.explorer_return = str(stored.get("explorer_return", self.explorer_return))
+                    self.explorer_context = dict(stored.get("explorer_context", {}))
             except (OSError, ValueError, TypeError):
                 self.championship_in_progress = False
 
@@ -116,6 +122,9 @@ class GameSession:
             "race_history": self.race_history,
             "championship_entries": self.championship_entries,
             "last_results": self.last_results,
+            "explorer_mode": self.explorer_mode,
+            "explorer_return": self.explorer_return,
+            "explorer_context": self.explorer_context,
         }
         self.state_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
@@ -134,6 +143,9 @@ class GameSession:
         }
         self.selected_track_id = self.tracks[0].id
         self.route_plan = None
+        self.explorer_mode = "full_race"
+        self.explorer_return = "menu"
+        self.explorer_context = {}
         self.save_state()
 
     def continue_championship(self) -> None:
@@ -143,6 +155,9 @@ class GameSession:
         else:
             self.selected_track_id = self.tracks[self.championship_index].id
             self.championship_status = "ACTIVE"
+            self.explorer_mode = "full_race"
+            self.explorer_return = "dashboard"
+            self.explorer_context = {}
             self.save_state()
 
     def select_quick_race(self, track_id: str) -> None:
@@ -151,6 +166,9 @@ class GameSession:
         self.mode = "quick"
         self.selected_track_id = track_id
         self.route_plan = None
+        self.explorer_mode = "full_race"
+        self.explorer_return = "circuit_selection"
+        self.explorer_context = {}
         self.save_state()
 
     def set_route_plan(self, route_plan: dict[str, Any]) -> None:

@@ -32,3 +32,25 @@ This ledger records evidence-backed work for the Smart Racing Championship final
 - Final archive SHA-256: `9B793B5C75747F77E01C705D577FFD6C3293AA4115F7503751E3C712F9820CEC`.
 - Clean extraction smoke: packaged core executable completed `circuit_03`; packaged Arcade executable rendered the corrected Dashboard smoke frame. PyInstaller emitted only the known Arcade `wintab32.dll` optional-library warning and the packaged Arcade VERSION permission warning; both processes exited successfully.
 - Next action: replace placeholder registration metadata; review and merge the stacked PRs in order if desired.
+
+## 2026-11-21 — Track Explorer functional-overhaul branch
+
+- Branch: `feature/track-explorer-functional-overhaul`, based on `feat/phase-06-qa-release`; no merge is claimed.
+- Implemented: explicit Free Exploration versus Full Race Plan modes, guarded source/destination selection, checkpoint-order modal, graph/route validation split, route freshness/revision tracking, weighted/BFS/DFS disclosures, route comparison, fuel/nitro planning acceptance, road-event close/reopen/restrict/undo/reset/recalculate workflow, start confirmation, Algorithm Lab context roundtrip, and responsive modal controls.
+- Added: authoritative geometry validator and circuit-01 duplicate-coordinate correction; all three circuits pass geometry validation with warnings recorded separately from errors.
+- Visual QA: inspected base Explorer frames at requested logical 1280x720, 1600x900, and 1920x1080 sizes, plus comparison, resource, road-event, and start-confirmation modal frames. Fixed a fullscreen smoke-size bug, narrow-width label/title collisions, a resource-modal tuple bug, and modal button overlap.
+- Verification: `python -m pytest -q` → 40 passed; `python -m ruff check .` → passed; `python -m compileall -q src tests run_*.py build_report.py` → passed. Full validation, championship, experiments, and report audits remain part of the final pre-push gate.
+
+## 2026-11-21 — Four-preset comparison correction
+
+- Corrected the Explorer comparison workflow so it always displays Balanced, Speed, Economy, and Safety from the shared weighted planner; identical paths remain separate objective candidates instead of being deduplicated.
+- Added symmetric selectable route cards with Time, Distance, Fuel, Cost, and Valid metrics, selected-state highlighting, invalid-candidate preservation, and responsive modal geometry.
+- Visual verification: inspected updated comparison captures at logical 1280x720 and 1600x900; fixed modal layering, focus outline leakage, and card metric/title overlap.
+- Regression: `python -m pytest -q` → 41 passed; `python -m ruff check .` → passed.
+
+## 2026-11-21 — Road Event Preview polish
+
+- Expanded the event modal with selected-road identity, direction, physical metrics, current status, shortcut/active-route flags, geometry, workflow instructions, temporary-change count, graph revision, and route status.
+- Added a no-op guard so applying the already-active status does not create false event history or invalidate a route.
+- Visual verification: inspected `docs/screenshots/arcade_explorer_events_1280.png` after the modal update.
+- Regression: `python -m pytest -q` → 42 passed; `python -m ruff check .` → passed.
