@@ -4,13 +4,13 @@ The project uses deterministic tests plus real Arcade/Pygame smoke captures. A f
 
 | Area | Automated evidence | Visual/command evidence | Current target |
 |---|---|---|---|
-| Circuit topology | `tests/unit/test_track_validation.py`, `run_validation.py` | Three circuit validation reports | Pass |
+| Circuit topology | `tests/unit/test_track_validation.py`, `tests/unit/test_tracks_and_events.py`, `run_validation.py` | Three circuit validation reports and shared start/finish timing-line inspection | Pass |
 | Ordered route planning | `tests/unit/test_route_planner.py` | Explorer route overlay captures | Pass |
 | Closures and rerouting | `tests/integration/test_ui_smoke.py`, race tests | Explorer blocked-edge capture | Pass |
 | Fuel and nitro | `tests/unit/test_route_planner.py`, `tests/integration/test_race.py` | Racing HUD capture | Pass |
 | Main Menu | `tests/unit/test_arcade_frontend.py` | Arcade 1280/1600/1920 captures | Pass |
 | Track Explorer | route/session, geometry, comparison-card, road-event, NEXT ROAD, and Explorer integration tests | `arcade_explorer_overhaul_1280.png`, `_1600.png`, `_1920.png`, `arcade_explorer_events_1280.png`, `arcade_explorer_events_next_1280.png`, `_1440.png`, `_1600.png`, responsive comparison/resources/start-confirmation captures | Pass |
-| Racing Screen | race replay/control/sprint tests; exact transferred-path and all-circuits/both-modes planned-route test | `planned_race_roads_1280.png`, `arcade_race_quick_modes_1280.png` | Pass |
+| Racing Screen | race replay/control/sprint tests; exact transferred-path, shared start/finish, and all-circuits/both-modes planned-route tests | `planned_race_roads_1280.png`, `arcade_race_quick_modes_1280.png` | Pass |
 | Algorithm Lab | catalog/session tests, comparison-selection tests, trace-hook tests, algorithm unit suite, direct 13-entry × 3-circuit and four-category comparison audit | `algorithm_lab_1280.png`, `algorithm_lab_1600.png`, `algorithm_lab_1920.png`, graph/DP/heap/sorting captures, `algorithm_comparison_weighted_1280.png` | Pass |
 | Championship Dashboard | scoring/championship tests | `arcade_dashboard_1280.png` | Pass |
 | Quick Race setup/results | route-gate, configuration, no-point-mutation, and all-circuits planned-path tests | `quick_setup_route_gate_1280.png`, `quick_results_centered_1280.png`, `quick_results_centered_1600.png` | Pass |

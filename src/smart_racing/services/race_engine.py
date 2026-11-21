@@ -229,6 +229,14 @@ class RaceEngine:
             if racer.lap >= self.config.laps:
                 racer.finished = True
             else:
+                # The finish line is the same physical position as the start
+                # line. Keep the finish vertex as the authoritative lap
+                # boundary, then place every racer back on the start vertex so
+                # the transferred player route can be replayed from index 0 on
+                # the next lap. Leaving the racer at ``finish_id`` makes an
+                # exact player path appear to have no next road and causes the
+                # player to wait indefinitely while AI racers re-plan.
+                racer.current_vertex = self.track.start_id
                 racer.next_checkpoint = 0
                 racer.current_path = []
                 racer.current_edge_index = 0

@@ -748,6 +748,14 @@ class GameApp:
             self._draw_arrow(screen, pygame, a, b, (235, 248, 255))
 
     def _draw_plan_markers(self, screen, pygame, rect, graph):
+        start_vertex = graph.vertices.get(self.explorer_start_id)
+        destination_vertex = graph.vertices.get(self.explorer_destination_id)
+        if (
+            start_vertex is not None
+            and destination_vertex is not None
+            and (start_vertex.x, start_vertex.y) == (destination_vertex.x, destination_vertex.y)
+        ):
+            return
         for vertex_id, label, color in ((self.explorer_start_id, "PLAN START", (52, 211, 153)), (self.explorer_destination_id, "PLAN DEST", (248, 250, 252))):
             vertex = graph.vertices.get(vertex_id)
             if vertex is None:
@@ -845,7 +853,16 @@ class GameApp:
         pygame.draw.line(screen, (251, 191, 36), (p1[0] + 4, p1[1] + 4), (p2[0] + 4, p2[1] + 4), 3)
 
     def _draw_services_and_checkpoints(self, screen, pygame, track, rect, graph, camera, show_details):
+        start = graph.vertices.get(track.start_id)
+        finish = graph.vertices.get(track.finish_id)
+        shared_timing_line = (
+            start is not None
+            and finish is not None
+            and (start.x, start.y) == (finish.x, finish.y)
+        )
         for vertex in graph.vertices.values():
+            if shared_timing_line and vertex.id == track.finish_id and vertex.id != track.start_id:
+                continue
             px, py = self._world_to_screen(vertex.x, vertex.y, rect, camera)
             if not rect.collidepoint(px, py):
                 continue
@@ -867,7 +884,11 @@ class GameApp:
                 pygame.draw.circle(screen, (248, 113, 113), (px, py), 10, 2)
             elif vertex.type == VertexType.START:
                 pygame.draw.circle(screen, (52, 211, 153), (px, py), 12, 3)
-                draw_text(screen, self._small, "START", (px - 22, py + 16), (52, 211, 153))
+                if shared_timing_line:
+                    pygame.draw.circle(screen, (248, 113, 113), (px, py), 16, 2)
+                    draw_text(screen, self._small, "START / FINISH", (px - 42, py + 16), (235, 248, 255))
+                else:
+                    draw_text(screen, self._small, "START", (px - 22, py + 16), (52, 211, 153))
             elif vertex.type == VertexType.FINISH:
                 pygame.draw.circle(screen, (248, 113, 113), (px, py), 12, 3)
                 draw_text(screen, self._small, "FINISH", (px - 24, py + 16), (248, 113, 113))

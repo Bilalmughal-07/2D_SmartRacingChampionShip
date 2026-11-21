@@ -38,14 +38,18 @@ def validate_geometry(track: Track, *, minimum_label_spacing: float = 18.0) -> G
     for index, first in enumerate(points):
         for second in points[index + 1 :]:
             if math.hypot(first.x - second.x, first.y - second.y) < 1e-6:
-                errors.append(f"duplicate coordinates at vertices {first.id} and {second.id}")
+                # The start and finish are distinct graph vertices at one
+                # physical timing line. Their IDs stay distinct for routing.
+                if {first.id, second.id} != {track.start_id, track.finish_id}:
+                    errors.append(f"duplicate coordinates at vertices {first.id} and {second.id}")
             if first.checkpoint_order and second.checkpoint_order and math.hypot(first.x - second.x, first.y - second.y) < minimum_label_spacing:
                 warnings.append(f"checkpoint labels {first.checkpoint_order} and {second.checkpoint_order} are close")
     segments = []
     for edge in track.edges:
         source, target = vertices[edge.from_id], vertices[edge.to_id]
         length = math.hypot(source.x - target.x, source.y - target.y)
-        if length < 1e-6 or edge.distance <= 0:
+        timing_line = {edge.from_id, edge.to_id} == {track.start_id, track.finish_id}
+        if (length < 1e-6 and not timing_line) or edge.distance <= 0:
             errors.append(f"edge {edge.id} has zero geometry or distance")
         segments.append((edge, (source.x, source.y), (target.x, target.y)))
     for index, (first, a, b) in enumerate(segments):

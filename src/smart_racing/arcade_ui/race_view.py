@@ -350,9 +350,18 @@ class ArcadeRacingView(ArcadeView):
             arcade.draw_line(*a, *b, color, 2)
 
     def _draw_vertex(self, vertex):
+        finish = self.engine.graph.vertices[self.track.finish_id]
+        if vertex.id == self.track.finish_id and vertex.id != self.track.start_id:
+            if vertex.x == self.engine.graph.vertices[self.track.start_id].x and vertex.y == self.engine.graph.vertices[self.track.start_id].y:
+                return
         x, y = self.world_to_screen(vertex.x, vertex.y)
+        start_finish = (
+            vertex.id == self.track.start_id
+            and finish.x == vertex.x
+            and finish.y == vertex.y
+        )
         if vertex.type == VertexType.START:
-            color, radius, label = EMERALD, 11, "S"
+            color, radius, label = EMERALD, 11, "S/F" if start_finish else "S"
         elif vertex.type == VertexType.FINISH:
             color, radius, label = CORAL, 11, "F"
         elif vertex.checkpoint_order:
@@ -366,6 +375,8 @@ class ArcadeRacingView(ArcadeView):
         else:
             color, radius, label = (155, 168, 183), 4, str(vertex.id)
         arcade.draw_circle_filled(x, y, radius, color)
+        if start_finish:
+            arcade.draw_circle_outline(x, y, radius, CORAL, 3)
         if vertex.id == self.engine._player().current_vertex if self.engine._player() else False:
             arcade.draw_circle_outline(x, y, radius + 7, WHITE, 2)
         arcade.draw_text(label, x, y + radius + 3, WHITE, font_size=9 if len(label) < 5 else 7, anchor_x="center", font_name=("Aptos Display", "Arial"), bold=True)

@@ -641,7 +641,15 @@ class TrackExplorerBridgeView(ArcadeView):
             if edge.directed:
                 mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
                 arcade.draw_circle_filled(mx, my, 3, AMBER)
+        start_finish_position = None
+        if track.start_id in graph.vertices and track.finish_id in graph.vertices:
+            start = graph.vertices[track.start_id]
+            finish = graph.vertices[track.finish_id]
+            if start.x == finish.x and start.y == finish.y:
+                start_finish_position = point(start)
         for vertex in graph.vertices.values():
+            if start_finish_position is not None and vertex.id == track.finish_id:
+                continue
             px, py = point(vertex)
             color = MUTED
             radius = 5
@@ -658,6 +666,11 @@ class TrackExplorerBridgeView(ArcadeView):
             arcade.draw_circle_filled(px, py, radius, color)
             if vertex.checkpoint_order or vertex.type in {VertexType.START, VertexType.FINISH}:
                 _text(str(vertex.checkpoint_order or ("S" if vertex.type == VertexType.START else "F")), px, py - 4, 9, NAVY, anchor_x="center")
+        if start_finish_position is not None:
+            px, py = start_finish_position
+            arcade.draw_circle_filled(px, py, 11, EMERALD)
+            arcade.draw_circle_outline(px, py, 11, CORAL, 3)
+            _text("S/F", px, py - 4, 8, NAVY, anchor_x="center")
 
 
 class TrackExplorerView(ArcadeView):
@@ -1834,6 +1847,16 @@ class TrackExplorerView(ArcadeView):
         arcade.draw_polygon_filled(points, color)
 
     def draw_vertex(self, vertex) -> None:
+        start = self.graph.vertices.get(self.track.start_id)
+        finish = self.graph.vertices.get(self.track.finish_id)
+        start_finish = (
+            vertex.id == self.track.start_id
+            and start is not None
+            and finish is not None
+            and (start.x, start.y) == (finish.x, finish.y)
+        )
+        if vertex.id == self.track.finish_id and vertex.id != self.track.start_id and start_finish:
+            return
         px, py = self.world_to_screen(vertex.x, vertex.y)
         if vertex.id == self.selected_vertex_id:
             arcade.draw_circle_outline(px, py, 24, WHITE, 2)
@@ -1855,10 +1878,12 @@ class TrackExplorerView(ArcadeView):
         elif vertex.type == VertexType.DEAD_END:
             color, radius = CORAL, 7
         arcade.draw_circle_filled(px, py, radius, color)
+        if start_finish:
+            arcade.draw_circle_outline(px, py, radius, CORAL, 3)
         if vertex.checkpoint_order:
             label = f"CP{vertex.checkpoint_order}"
         elif vertex.type == VertexType.START:
-            label = "S"
+            label = "S/F" if start_finish else "S"
         elif vertex.type == VertexType.FINISH:
             label = "F"
         elif vertex.type == VertexType.FUEL_STATION:

@@ -84,6 +84,14 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 - Visual evidence inspected: `quick_setup_route_gate_1280.png`, `route_planner_gate_1280.png`, `planned_race_roads_1280.png`, `quick_results_centered_1280.png`, and `championship_dashboard_route_flow_1280.png`.
 - Verification after this phase: 55 tests passed, Ruff passed, all three circuits completed planned-path races in both Quick and Championship modes, and all validation reports remained valid.
 
+## Shared start/finish lap boundary fix (2026-11-21)
+
+- Updated the authoritative generator and JSON tracks so each circuit's finish vertex occupies the exact same world coordinate as its start vertex. The graph IDs remain distinct so the finish still acts as the lap boundary for ordered routing.
+- Added an intentional timing-line exception to geometry validation for the colocated start/finish pair and its zero-length graph boundary edge; all unrelated duplicate coordinates and zero-length roads remain validation errors.
+- Fixed `RaceEngine` to move every racer back to `start_id` after a completed non-final lap. The transferred Explorer `player_path` therefore restarts at route index 0 instead of waiting at `finish_id`.
+- Added regression coverage for shared coordinates and two-lap transferred-route completion on all three circuits. The player now finishes with 30 completed checkpoint events and no DNF in the default two-lap race.
+- Verification after this fix: 57 tests passed, Ruff passed, compile checks passed, `run_validation.py`, headless race, full championship simulation, and Arcade visual smoke all passed. Explorer, racing, and results screenshots were inspected after the fix.
+
 ## Next actions
 
 1. Rebuild the final ZIP after replacing the placeholder registration numbers and section.

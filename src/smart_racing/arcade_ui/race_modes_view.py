@@ -39,6 +39,16 @@ class _TrackPreviewMixin:
             color = CORAL if edge.status == EdgeStatus.BLOCKED else PURPLE if edge.is_shortcut else (91, 116, 142)
             arcade.draw_line(*a, *b, color, 6 if edge.is_shortcut else 4)
         for vertex in vertices:
+            start = graph.vertices.get(track.start_id)
+            finish = graph.vertices.get(track.finish_id)
+            if (
+                vertex.id == track.finish_id
+                and vertex.id != track.start_id
+                and start is not None
+                and finish is not None
+                and (start.x, start.y) == (finish.x, finish.y)
+            ):
+                continue
             x, y = point(vertex)
             if vertex.type == VertexType.START:
                 color, label = EMERALD, "S"
@@ -53,6 +63,9 @@ class _TrackPreviewMixin:
             else:
                 color, label = (138, 158, 181), str(vertex.id)
             arcade.draw_circle_filled(x, y, 8 if vertex.checkpoint_order else 6, color)
+            if vertex.id == track.start_id and finish is not None and (vertex.x, vertex.y) == (finish.x, finish.y):
+                arcade.draw_circle_outline(x, y, 8 if vertex.checkpoint_order else 6, CORAL, 2)
+                label = "S/F"
             _text(label, x, y - 4, 8, NAVY, anchor_x="center", bold=True)
 
 
