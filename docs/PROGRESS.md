@@ -73,6 +73,17 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 - Added responsive Arcade smoke captures for Quick Race setup and Championship Dashboard at 1280x720 and 1600x900, inspected after fixing header and control-panel overlap. Quick Results also has a verified empty-state report for a fresh session.
 - Verification after this phase: 50 tests passed, Ruff passed, compile checks passed, `run_validation.py` passed for all three circuits, three one-lap Quick Race engine smokes completed without DNF, and a three-round championship session completed with points and tie-break data persisted.
 
+## Mandatory route gate and race presentation (2026-11-21)
+
+- Quick Race now follows `Select Circuit → Track Explorer → Plan Route → Start Race → Race Results`; its setup action is `PLAN ROUTE`, and it cannot instantiate a live race before Explorer confirmation.
+- Championship rounds now return to Track Explorer for every scheduled circuit. Each round requires a fresh route, ordered checkpoints, open-road connectivity, fuel feasibility, and accepted resource plan before the race can start.
+- Added pure `race_route_validation.py` checks for route freshness, source/finish, graph connections, blocked roads, checkpoint order, fuel feasibility, and resource acceptance. Invalid plans stay in route planning with a clear error.
+- The confirmed Explorer path is transferred as `player_path`, ordered checkpoints, selected algorithm, strategy, edge IDs, blocked-road state, metrics, and resource plan. Human movement follows those exact planned edges; AI route planning uses the selected strategy preset.
+- Replaced thin Racing View graph strokes and triangle cars with layered asphalt shoulders, consistent road surfaces, dashed lane markings, shortcut markings, intersection pads, directed arrows, and stylized 2D racing cars while retaining the graph as the authoritative gameplay model.
+- Reworked race results into a centered, padded report panel with aligned columns and centered bottom actions. Quick results expose Retry, Change Circuit, and Main Menu; championship results expose standings and next-round/final navigation without duplicate scoring.
+- Visual evidence inspected: `quick_setup_route_gate_1280.png`, `route_planner_gate_1280.png`, `planned_race_roads_1280.png`, `quick_results_centered_1280.png`, and `championship_dashboard_route_flow_1280.png`.
+- Verification after this phase: 55 tests passed, Ruff passed, all three circuits completed planned-path races in both Quick and Championship modes, and all validation reports remained valid.
+
 ## Next actions
 
 1. Rebuild the final ZIP after replacing the placeholder registration numbers and section.

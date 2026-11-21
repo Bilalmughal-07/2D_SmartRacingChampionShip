@@ -45,6 +45,7 @@ class Racer:
     exit_confirmed: bool = False
     fuel_used: float = 0.0
     nitro_uses: int = 0
+    planned_route_index: int = 0
 
 
 @dataclass

@@ -98,10 +98,10 @@ class ChampionshipDashboardView(ArcadeView):
         if self.session.championship_index >= len(self.session.tracks):
             self.status = "Championship complete: final champion is shown below."
             return
-        config = self.session.prepare_championship_race()
-        from smart_racing.arcade_ui.race_view import ArcadeRacingView
+        self.session.prepare_championship_race()
+        from smart_racing.arcade_ui.app import TrackExplorerView
 
-        self.app.show_view(ArcadeRacingView(self.app, self.session, race_config=config))
+        self.app.show_view(TrackExplorerView(self.app, self.session))
 
     def on_resize(self, width: int, height: int):
         super().on_resize(width, height)

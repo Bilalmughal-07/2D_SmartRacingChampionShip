@@ -29,8 +29,16 @@ class ArcadeRacingView(ArcadeView):
 
     def __init__(self, window, session, race_config: dict | None = None):
         self.track = session.selected_track
-        self.route_config = dict(session.route_plan or {})
         self.race_config = dict(race_config or session.quick_race_config or {})
+        self.route_config = dict(session.route_plan or {})
+        for key in ("race_id", "race_mode", "round_index"):
+            if key in self.race_config:
+                self.route_config[key] = self.race_config[key]
+        self.route_blocked = not bool(
+            self.route_config.get("player_path")
+            and self.route_config.get("checkpoint_aware")
+            and self.route_config.get("fuel_feasible")
+        )
         laps = int(self.race_config.get("laps", self.track.laps))
         time_limit = float(self.race_config.get("time_limit", self.track.time_limit))
         config = replace(DEFAULT_CONFIG, laps=max(1, laps), race_time_limit=max(30.0, time_limit))
@@ -41,7 +49,7 @@ class ArcadeRacingView(ArcadeView):
             events_enabled=bool(self.race_config.get("events_enabled", True)),
             ai_difficulty=str(self.race_config.get("ai_difficulty", "Normal")),
         )
-        self.paused = False
+        self.paused = self.route_blocked
         self.camera_mode = "FOLLOW"
         self.show_minimap = True
         self.show_route = True
@@ -53,7 +61,11 @@ class ArcadeRacingView(ArcadeView):
         self.camera_zoom = 1.35
         self.results = None
         self.results_recorded = False
-        self.status_message = "Race ready. Choose speed, route exits, fuel and nitro decisions."
+        self.status_message = (
+            "Racing blocked: return to Track Explorer and accept a valid checkpoint-aware route."
+            if self.route_blocked
+            else "Race ready on the selected planned route. Choose speed, fuel and nitro decisions."
+        )
         super().__init__(window, session)
 
     def rebuild_ui(self) -> None:
@@ -142,7 +154,7 @@ class ArcadeRacingView(ArcadeView):
         self.rebuild_ui()
 
     def on_update(self, delta_time: float):
-        if self.paused or self.results:
+        if self.route_blocked or self.paused or self.results:
             return
         player = self.engine._player()
         if player:
@@ -272,30 +284,34 @@ class ArcadeRacingView(ArcadeView):
             target = self.engine.graph.vertices[edge.to_id]
             a, b = self.world_to_screen(source.x, source.y), self.world_to_screen(target.x, target.y)
             if edge.status == EdgeStatus.BLOCKED:
-                border, road = CORAL, (66, 29, 40)
+                shoulder, road, marking = (110, 38, 49), (66, 29, 40), CORAL
             elif edge.status == EdgeStatus.RESTRICTED:
-                border, road = AMBER, (86, 69, 34)
+                shoulder, road, marking = (115, 91, 42), (86, 69, 34), AMBER
+            elif edge.is_shortcut:
+                shoulder, road, marking = (76, 48, 105), (48, 45, 65), PURPLE
             else:
-                border, road = (126, 143, 160), (55, 65, 76)
-            arcade.draw_line(*a, *b, border, 18)
-            arcade.draw_line(*a, *b, road, 12)
-            if edge.is_shortcut and edge.status != EdgeStatus.BLOCKED:
-                arcade.draw_line(*a, *b, PURPLE, 3)
+                shoulder, road, marking = (18, 29, 43), (58, 68, 79), (190, 198, 205)
+            arcade.draw_line(*a, *b, shoulder, 32)
+            arcade.draw_line(*a, *b, road, 25)
+            self._lane_marking(a, b, marking, dashed=edge.is_shortcut or edge.status != EdgeStatus.OPEN)
             if edge.directed:
                 self._arrow(a, b, AMBER if edge.status != EdgeStatus.BLOCKED else CORAL)
             if edge.status == EdgeStatus.BLOCKED:
                 mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
                 arcade.draw_line(mx - 10, my - 10, mx + 10, my + 10, CORAL, 3)
                 arcade.draw_line(mx - 10, my + 10, mx + 10, my - 10, CORAL, 3)
+        for vertex in self.engine.graph.vertices.values():
+            x, y = self.world_to_screen(vertex.x, vertex.y)
+            arcade.draw_circle_filled(x, y, 16, (47, 57, 68))
         if self.show_route:
-            route = self.route_config.get("path", [])
+            route = self.route_config.get("player_path") or self.route_config.get("path", [])
             if route:
                 for source_id, target_id in zip(route, route[1:]):
                     source, target = self.engine.graph.vertices.get(source_id), self.engine.graph.vertices.get(target_id)
                     if source and target:
                         a, b = self.world_to_screen(source.x, source.y), self.world_to_screen(target.x, target.y)
-                        arcade.draw_line(*a, *b, (3, 20, 30), 21)
-                        arcade.draw_line(*a, *b, CYAN, 9)
+                        arcade.draw_line(*a, *b, (3, 20, 30), 29)
+                        arcade.draw_line(*a, *b, CYAN, 8)
                         self._arrow(a, b, WHITE)
         for vertex in self.engine.graph.vertices.values():
             self._draw_vertex(vertex)
@@ -310,6 +326,28 @@ class ArcadeRacingView(ArcadeView):
         ux, uy = dx / length, dy / length
         px, py = -uy, ux
         arcade.draw_polygon_filled([(mx + ux * 9, my + uy * 9), (mx - ux * 5 + px * 5, my - uy * 5 + py * 5), (mx - ux * 5 - px * 5, my - uy * 5 - py * 5)], color)
+
+    @staticmethod
+    def _lane_marking(a, b, color, *, dashed: bool = False) -> None:
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        length = max(1.0, math.hypot(dx, dy))
+        ux, uy = dx / length, dy / length
+        if dashed:
+            dash, gap = 12.0, 9.0
+            position = 7.0
+            while position < length - 5:
+                end = min(position + dash, length - 3)
+                arcade.draw_line(
+                    a[0] + ux * position,
+                    a[1] + uy * position,
+                    a[0] + ux * end,
+                    a[1] + uy * end,
+                    color,
+                    2,
+                )
+                position += dash + gap
+        else:
+            arcade.draw_line(*a, *b, color, 2)
 
     def _draw_vertex(self, vertex):
         x, y = self.world_to_screen(vertex.x, vertex.y)
@@ -341,9 +379,20 @@ class ArcadeRacingView(ArcadeView):
             b = self.engine.graph.vertices[racer.current_path[racer.current_edge_index + 1]]
             angle = math.atan2(b.y - a.y, b.x - a.x)
         ux, uy, px, py = math.cos(angle), math.sin(angle), -math.sin(angle), math.cos(angle)
-        points = [(x + ux * 15, y + uy * 15), (x - ux * 10 + px * 7, y - uy * 10 + py * 7), (x - ux * 10 - px * 7, y - uy * 10 - py * 7)]
-        arcade.draw_polygon_filled(points, color)
-        arcade.draw_polygon_outline(points, WHITE if racer.is_human else (20, 28, 42), 2)
+
+        def local(point):
+            forward, lateral = point
+            return x + ux * forward + px * lateral, y + uy * forward + py * lateral
+
+        body = [local(point) for point in ((15, 0), (10, 6), (-9, 6), (-14, 4), (-14, -4), (-9, -6), (10, -6))]
+        roof = [local(point) for point in ((7, 4), (2, 4), (-5, 3), (-5, -3), (2, -4), (7, -4))]
+        arcade.draw_polygon_filled(body, color)
+        arcade.draw_polygon_outline(body, WHITE if racer.is_human else (20, 28, 42), 2)
+        arcade.draw_polygon_filled(roof, (34, 46, 63))
+        arcade.draw_polygon_outline(roof, WHITE, 1)
+        for wheel in ((7, 7), (7, -7), (-8, 7), (-8, -7)):
+            arcade.draw_circle_filled(*local(wheel), 2.8, (9, 12, 18))
+        arcade.draw_line(*local((-11, -7)), *local((-11, 7)), (9, 12, 18), 2)
         if racer.active_nitro or racer.sprint_active:
             arcade.draw_line(x - ux * 11, y - uy * 11, x - ux * 23, y - uy * 23, AMBER if racer.sprint_active else PURPLE, 4)
         _text(racer.name[0], x, y - 4, 9, NAVY, anchor_x="center", bold=True)

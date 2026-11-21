@@ -14,6 +14,7 @@ from smart_racing.arcade_ui.session import DEFAULT_SETTINGS, GameSession
 from smart_racing.config import DEFAULT_CONFIG
 from smart_racing.model.graph import EdgeStatus
 from smart_racing.services.race_engine import RaceEngine
+from smart_racing.services.race_route_validation import validate_planned_route
 from smart_racing.services.route_planner import RoutePlanner
 from smart_racing.services.track_loader import load_tracks
 
@@ -348,7 +349,7 @@ def test_quick_race_setup_persists_config_without_championship_points(tmp_path):
     engine = RaceEngine(
         tracks[1],
         config=replace(DEFAULT_CONFIG, laps=config["laps"]),
-        route_config=session.route_plan,
+        route_config={"race_mode": config["race_mode"], "race_id": config["race_id"]},
         events_enabled=config["events_enabled"],
         ai_difficulty=config["ai_difficulty"],
     )
@@ -375,3 +376,90 @@ def test_championship_round_config_is_unique_and_uses_next_track(tmp_path):
     assert second["round_index"] == 1
     assert second["race_id"] != first["race_id"]
     assert session.selected_track_id == tracks[1].id
+
+
+def test_race_route_validation_rejects_stale_or_blocked_plans():
+    track = load_tracks()[0]
+    planner = RoutePlanner(track, "speed")
+    graph = track.graph()
+    report = planner.plan_route(track.start_id, track.finish_id, "dijkstra", checkpoint_aware=True)
+    valid = validate_planned_route(
+        track,
+        graph,
+        report,
+        route_revision=4,
+        graph_revision=4,
+        source_id=track.start_id,
+        destination_id=track.finish_id,
+        resource_accepted=True,
+    )
+    assert valid["valid"]
+    graph.set_edge_status(report["metrics"]["edge_ids"][0], EdgeStatus.BLOCKED)
+    blocked = validate_planned_route(
+        track,
+        graph,
+        report,
+        route_revision=4,
+        graph_revision=4,
+        source_id=track.start_id,
+        destination_id=track.finish_id,
+        resource_accepted=True,
+    )
+    assert not blocked["valid"]
+    assert any("blocked" in error for error in blocked["errors"])
+    stale = validate_planned_route(
+        track,
+        track.graph(),
+        report,
+        route_revision=3,
+        graph_revision=4,
+        source_id=track.start_id,
+        destination_id=track.finish_id,
+        resource_accepted=True,
+    )
+    assert not stale["valid"]
+    assert any("stale" in error for error in stale["errors"])
+
+
+def test_race_engine_uses_the_transferred_player_path_and_strategy():
+    track = load_tracks()[0]
+    report = RoutePlanner(track, "speed").plan_route(
+        track.start_id, track.finish_id, "dijkstra", checkpoint_aware=True
+    )
+    engine = RaceEngine(
+        track,
+        route_config={
+            "player_path": report["path"],
+            "preset": "speed",
+            "strategy": "speed",
+            "race_mode": "quick",
+        },
+        events_enabled=False,
+    )
+    assert engine.planner.cost_model.preset == "speed"
+    assert engine._choose_plan(engine._player())["path"] == report["path"][:2]
+    engine.tick()
+    assert engine.racers[0].current_path[:2] == report["path"][:2]
+
+
+def test_planned_route_flow_completes_on_all_circuits_in_both_modes():
+    for mode in ("quick", "championship"):
+        for track in load_tracks():
+            report = RoutePlanner(track, "economy").plan_route(
+                track.start_id, track.finish_id, "dijkstra", checkpoint_aware=True
+            )
+            engine = RaceEngine(
+                track,
+                route_config={
+                    "player_path": report["path"],
+                    "preset": "economy",
+                    "strategy": "economy",
+                    "race_mode": mode,
+                    "race_id": f"{mode}-{track.id}",
+                },
+                events_enabled=False,
+            )
+            assert engine._choose_plan(engine._player())["path"] == report["path"][:2]
+            results = engine.run()
+            assert len(results) == 4
+            assert all(not result.dnf for result in results)

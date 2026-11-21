@@ -25,6 +25,7 @@ from smart_racing.arcade_ui.theme import (
 )
 from smart_racing.model.graph import EdgeStatus, VertexType
 from smart_racing.services.geometry_validator import validate_geometry
+from smart_racing.services.race_route_validation import validate_planned_route
 from smart_racing.services.route_planner import ALGORITHM_COMPLEXITY, RoutePlanner
 from smart_racing.services.track_validator import TrackValidator
 
@@ -922,6 +923,10 @@ class TrackExplorerView(ArcadeView):
         target = self.session.explorer_return
         if target == "circuit_selection":
             self.app.show_view(CircuitSelectionView(self.app, self.session))
+        elif target == "quick_setup":
+            from smart_racing.arcade_ui.race_modes_view import QuickRaceSetupView
+
+            self.app.show_view(QuickRaceSetupView(self.app, self.session))
         elif target == "dashboard":
             from smart_racing.arcade_ui.dashboard_view import ChampionshipDashboardView
 
@@ -1237,15 +1242,16 @@ class TrackExplorerView(ArcadeView):
             self.status_message = "Race blocked: source must be the circuit start vertex."
             self.status_color = CORAL
             return
-        if self.route_result is None or self.route_revision != self.graph_revision or self.route_state in {"ROUTE_STALE", "ROUTE_INVALID"}:
-            self.calculate_route()
-        if not self.route_result or not self.route_result.get("resources", {}).get("fuel_feasible", False):
-            self.status_message = "Race blocked: route has no feasible fuel plan. Open Plan Resources for details."
+        validation = self.validate_race_plan(require_resource_acceptance=False)
+        if not validation["valid"]:
+            self.status_message = "Race blocked: " + validation["errors"][0]
             self.status_color = CORAL
+            self.route_state = "ROUTE_INVALID" if self.route_result else "NO_ROUTE"
+            self.rebuild_ui()
             return
         if not self.resource_accepted:
-            self.modal = "start_confirm"
-            self.status_message = "Review the validated plan, then confirm the race start."
+            self.modal = "resources"
+            self.status_message = "Accept the validated fuel/nitro plan before confirming the race start."
             self.status_color = CYAN
             self.rebuild_ui()
             return
@@ -1254,8 +1260,19 @@ class TrackExplorerView(ArcadeView):
     def confirm_start_race(self) -> None:
         if not self.route_result:
             return
+        validation = self.validate_race_plan(require_resource_acceptance=True)
+        if not validation["valid"]:
+            self.modal = None
+            self.status_message = "Race blocked: " + validation["errors"][0]
+            self.status_color = CORAL
+            self.route_state = "ROUTE_INVALID"
+            self.rebuild_ui()
+            return
         metrics = self.route_result["metrics"]
         resources = self.route_result.get("resources", {})
+        blocked_edges = [
+            edge_id for edge_id, edge in self.graph.edges.items() if edge.status == EdgeStatus.BLOCKED
+        ]
         self.session.set_route_plan(
             {
                 "track_id": self.track.id,
@@ -1265,7 +1282,12 @@ class TrackExplorerView(ArcadeView):
                 "destination": self.destination_id,
                 "checkpoint_aware": self.explorer_mode == "full_race",
                 "path": list(self.route_result["path"]),
+                "player_path": list(self.route_result["path"]),
+                "ordered_checkpoints": list(self.track.checkpoint_ids),
+                "strategy": self.preset if self.algorithm in {"Dijkstra", "A*"} else "balanced",
                 "edge_ids": list(metrics.get("edge_ids", [])),
+                "blocked_edges": blocked_edges,
+                "graph_revision": self.graph_revision,
                 "metrics": {key: value for key, value in metrics.items() if isinstance(value, (bool, int, float, str))},
                 "fuel_feasible": bool(resources.get("fuel_feasible", False)),
                 "required_refuelling_stops": resources.get("required_refuelling_stops", []),
@@ -1275,6 +1297,19 @@ class TrackExplorerView(ArcadeView):
         )
         self.modal = None
         self.app.show_view(ArcadeRacingView(self.app, self.session))
+
+    def validate_race_plan(self, *, require_resource_acceptance: bool) -> dict:
+        """Return validation for the exact route currently shown in Explorer."""
+        return validate_planned_route(
+            self.track,
+            self.graph,
+            self.route_result,
+            route_revision=self.route_revision,
+            graph_revision=self.graph_revision,
+            source_id=self.source_id,
+            destination_id=self.destination_id,
+            resource_accepted=self.resource_accepted if require_resource_acceptance else True,
+        )
 
     def toggle_closure(self) -> None:
         self.open_event_modal()

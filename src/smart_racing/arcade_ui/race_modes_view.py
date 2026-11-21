@@ -84,7 +84,7 @@ class QuickRaceSetupView(_TrackPreviewMixin, ArcadeView):
         self.add_button("HOW TO PLAY", 118, nav_y, 132, 38, self.toggle_help, NAVY, WHITE, CYAN)
         self.add_button("< CIRCUIT", 28, 88, 126, 38, lambda: self.change_track(-1), NAVY, WHITE, CYAN)
         self.add_button("CIRCUIT >", 164, 88, 126, 38, lambda: self.change_track(1), NAVY, WHITE, CYAN)
-        self.add_button("START QUICK RACE", width - 286, 88, 258, 44, self.start_race, EMERALD, NAVY, EMERALD)
+        self.add_button("PLAN ROUTE", width - 286, 88, 258, 44, self.start_race, EMERALD, NAVY, EMERALD)
         panel_left = max(520, width * 0.48)
         panel_width = width - panel_left - 26
         option_y = 315 if height <= 760 else max(330, int(height * 0.38))
@@ -122,7 +122,7 @@ class QuickRaceSetupView(_TrackPreviewMixin, ArcadeView):
         self.rebuild_ui()
 
     def start_race(self) -> None:
-        config = self.session.configure_quick_race(
+        self.session.configure_quick_race(
             self.track.id,
             laps=self.laps,
             ai_difficulty=self.ai_difficulty,
@@ -131,9 +131,9 @@ class QuickRaceSetupView(_TrackPreviewMixin, ArcadeView):
         )
         self.session.explorer_return = "quick_setup"
         self.session.save_state()
-        from smart_racing.arcade_ui.race_view import ArcadeRacingView
+        from smart_racing.arcade_ui.app import TrackExplorerView
 
-        self.app.show_view(ArcadeRacingView(self.app, self.session, race_config=config))
+        self.app.show_view(TrackExplorerView(self.app, self.session))
 
     def draw_content(self) -> None:
         width, height = self.window.width, self.window.height
@@ -202,16 +202,28 @@ class RaceResultsView(ArcadeView):
 
     def rebuild_ui(self) -> None:
         self.clear_ui()
-        _width, height = self.window.width, self.window.height
-        nav_y = height - 56
-        self.add_button("MAIN MENU", 18, nav_y, 120, 38, self.go_menu, NAVY, WHITE, CYAN)
+        width = self.window.width
+        button_y = 28
         if self.championship:
-            self.add_button("STANDINGS", 148, nav_y, 126, 38, self.open_dashboard, CYAN, NAVY, CYAN)
+            actions = [
+                ("MAIN MENU", self.go_menu, NAVY, WHITE, CYAN),
+                ("VIEW STANDINGS", self.open_dashboard, CYAN, NAVY, CYAN),
+            ]
             if not self.final:
-                self.add_button("NEXT ROUND", 284, nav_y, 126, 38, self.next_round, EMERALD, NAVY, EMERALD)
+                actions.append(("NEXT ROUND", self.next_round, EMERALD, NAVY, EMERALD))
         else:
-            self.add_button("RETRY", 148, nav_y, 100, 38, self.retry, EMERALD, NAVY, EMERALD)
-            self.add_button("CHANGE SETUP", 258, nav_y, 144, 38, self.change_setup, CYAN, NAVY, CYAN)
+            actions = [
+                ("MAIN MENU", self.go_menu, NAVY, WHITE, CYAN),
+                ("RETRY", self.retry, EMERALD, NAVY, EMERALD),
+                ("CHANGE CIRCUIT", self.change_setup, CYAN, NAVY, CYAN),
+            ]
+        gap = 12
+        total_width = sum(150 if label == "CHANGE CIRCUIT" else 136 for label, *_ in actions) + gap * (len(actions) - 1)
+        cursor = (width - total_width) / 2
+        for label, callback, fill, text, border in actions:
+            button_width = 150 if label == "CHANGE CIRCUIT" else 136
+            self.add_button(label, cursor, button_y, button_width, 40, callback, fill, text, border)
+            cursor += button_width + gap
 
     def go_menu(self) -> None:
         from smart_racing.arcade_ui.app import MainMenuView
@@ -229,9 +241,9 @@ class RaceResultsView(ArcadeView):
             self.rebuild_ui()
             return
         self.session.prepare_championship_race()
-        from smart_racing.arcade_ui.race_view import ArcadeRacingView
+        from smart_racing.arcade_ui.app import TrackExplorerView
 
-        self.app.show_view(ArcadeRacingView(self.app, self.session, race_config=self.session.quick_race_config))
+        self.app.show_view(TrackExplorerView(self.app, self.session))
 
     def retry(self) -> None:
         from smart_racing.arcade_ui.race_modes_view import QuickRaceSetupView
@@ -239,7 +251,13 @@ class RaceResultsView(ArcadeView):
         self.app.show_view(QuickRaceSetupView(self.app, self.session))
 
     def change_setup(self) -> None:
-        self.retry()
+        from smart_racing.arcade_ui.race_modes_view import QuickRaceSetupView
+
+        setup = QuickRaceSetupView(self.app, self.session)
+        setup.track_index = (setup.track_index + 1) % len(self.session.tracks)
+        setup.session.selected_track_id = setup.track.id
+        setup.session.save_state()
+        self.app.show_view(setup)
 
     def draw_content(self) -> None:
         width, height = self.window.width, self.window.height
@@ -247,12 +265,15 @@ class RaceResultsView(ArcadeView):
         arcade.draw_lbwh_rectangle_filled(0, height - 74, width, 74, (14, 27, 46))
         arcade.draw_line(0, height - 74, width, height - 74, CYAN, 2)
         title = "CHAMPIONSHIP FINAL" if self.final else "CHAMPIONSHIP ROUND RESULTS" if self.championship else "QUICK RACE RESULTS"
-        _text(title, 430, height - 31, 25, WHITE, bold=True)
-        _text(self.status.upper(), 430, height - 56, 11, EMERALD if self.final else CYAN)
-        left, bottom, panel_width = 28, 112, width - 56
-        self.draw_panel(left, bottom, panel_width, height - 240, 248)
+        _text(title, width / 2, height - 31, 25, WHITE, anchor_x="center", bold=True)
+        _text(self.status.upper(), width / 2, height - 56, 11, EMERALD if self.final else CYAN, anchor_x="center")
+        panel_width = min(1140, width - 80)
+        left, bottom = (width - panel_width) / 2, 96
+        self.draw_panel(left, bottom, panel_width, height - 206, 248)
         _text(self.result_track.name, left + 22, height - 146, 18, CYAN, bold=True)
-        _text("POS   RACER              TIME       FASTEST LAP   FUEL USED   NITRO   STATUS", left + 22, height - 181, 11, MUTED, bold=True)
+        columns = (left + 24, left + 82, left + 260, left + 370, left + 510, left + 620, left + 700)
+        for label, x in zip(("POS", "RACER", "TIME", "FASTEST LAP", "FUEL USED", "NITRO", "STATUS"), columns):
+            _text(label, x, height - 181, 11, MUTED, bold=True)
         if not self.results:
             _text("No completed race is recorded yet. Finish a live race to populate this report.", left + 22, height - 224, 13, MUTED)
         for index, result in enumerate(self.results):
@@ -260,10 +281,21 @@ class RaceResultsView(ArcadeView):
             name = {1: "Player", 2: "Navigator", 3: "Shortcut", 4: "Distance"}.get(result.get("racer_id"), f"Racer {result.get('racer_id')}")
             time = "DNF" if result.get("dnf") else f"{float(result.get('finish_time') or 0):.1f}s"
             lap = "—" if result.get("fastest_lap") is None else f"{float(result['fastest_lap']):.1f}s"
-            status = "DNF" if result.get("dnf") else f"+{result.get('points_awarded', 0)} pts"
+            status = "DNF" if result.get("dnf") else (f"+{result.get('points_awarded', 0)} pts" if self.championship else "FINISHED")
             if name == "Player":
                 arcade.draw_lbwh_rectangle_filled(left + 12, y - 10, panel_width - 24, 32, (21, 71, 85, 190))
-            _text(f"{result.get('finish_position', index + 1):>3}   {name:<18} {time:>8}   {lap:>11}   {float(result.get('fuel_used', 0)) :>8.1f}   {result.get('nitro_used', 0):>5}   {status}", left + 22, y, 12, CYAN if name == "Player" else WHITE, bold=name == "Player")
+            row_color = CYAN if name == "Player" else WHITE
+            values = (
+                str(result.get("finish_position", index + 1)),
+                name,
+                time,
+                lap,
+                f"{float(result.get('fuel_used', 0)):.1f}",
+                str(result.get("nitro_used", 0)),
+                status,
+            )
+            for value, x in zip(values, columns):
+                _text(value, x, y, 12, row_color, bold=name == "Player")
         if self.championship:
             _text("CHAMPIONSHIP STANDINGS", left + 22, bottom + 94, 13, AMBER, bold=True)
             entries = sorted(self.session.championship_entries.values(), key=lambda item: (-int(item.get("total_points", 0)), int(item.get("racer_id", 99))))

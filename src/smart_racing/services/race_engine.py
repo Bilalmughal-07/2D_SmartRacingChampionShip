@@ -50,6 +50,12 @@ class RaceEngine:
         self.route_algorithm = str(self.route_config.get("algorithm") or "Dijkstra").lower()
         if self.route_algorithm == "a*":
             self.route_algorithm = "astar"
+        self.strategy_preset = str(
+            self.route_config.get("strategy") or self.route_config.get("preset") or "balanced"
+        ).lower()
+        self.player_route = [
+            int(vertex_id) for vertex_id in self.route_config.get("player_path", [])
+        ]
         # Each race owns a graph snapshot; services and pickup availability must
         # not leak into the next replay or championship race.
         self.graph = copy.deepcopy(track.graph())
@@ -226,8 +232,14 @@ class RaceEngine:
                 racer.next_checkpoint = 0
                 racer.current_path = []
                 racer.current_edge_index = 0
+                racer.planned_route_index = 0
 
     def _choose_plan(self, racer: Racer):
+        if racer.strategy_type == RacerStrategy.HUMAN and self.player_route:
+            planned = self._planned_player_plan(racer)
+            if planned is not None:
+                return planned
+            return {"path": [racer.current_vertex]}
         if (
             racer.strategy_type == RacerStrategy.HUMAN
             and racer.selected_exit is not None
@@ -243,7 +255,9 @@ class RaceEngine:
                     return {**suffix, "path": [racer.current_vertex, *suffix["path"]]}
         if racer.strategy_type == RacerStrategy.MIN_DISTANCE:
             saved = self.planner.cost_model.preset
-            self.planner.cost_model.set_preset("balanced")
+            self.planner.cost_model.set_preset(
+                "balanced" if self.strategy_preset == "balanced" else self.strategy_preset
+            )
             result = self.planner.plan_checkpoints(
                 racer.current_vertex, racer.next_checkpoint, algorithm=self.route_algorithm, include_resources=False
             )
@@ -252,6 +266,39 @@ class RaceEngine:
         return self.planner.plan_checkpoints(
             racer.current_vertex, racer.next_checkpoint, algorithm=self.route_algorithm, include_resources=False
         )
+
+    def _planned_player_plan(self, racer: Racer) -> dict | None:
+        """Return the next exact player road from the Explorer handoff."""
+        if len(self.player_route) < 2:
+            return None
+        index = max(0, racer.planned_route_index)
+        if index >= len(self.player_route) or self.player_route[index] != racer.current_vertex:
+            matches = [
+                position
+                for position, vertex_id in enumerate(self.player_route[:-1])
+                if vertex_id == racer.current_vertex and position >= index
+            ]
+            if not matches:
+                matches = [
+                    position
+                    for position, vertex_id in enumerate(self.player_route[:-1])
+                    if vertex_id == racer.current_vertex
+                ]
+            if not matches:
+                return None
+            index = matches[0]
+            racer.planned_route_index = index
+        if index >= len(self.player_route) - 1:
+            return None
+        target = self.player_route[index + 1]
+        edge = self.graph.edge_between(racer.current_vertex, target)
+        if edge is None or not edge.traversable():
+            return {"path": [racer.current_vertex, target], "planned_blocked": True}
+        return {
+            "path": [racer.current_vertex, target],
+            "metrics": {"edge_ids": [edge.id]},
+            "planned": True,
+        }
 
     def _advance_racer(self, racer: Racer, dt: float):
         if racer.finished or racer.dnf:
@@ -267,6 +314,7 @@ class RaceEngine:
             racer.waiting = max(0.0, racer.waiting - dt)
             racer.total_time += dt
             return
+        plan = {}
         if racer.edge_progress > 0 and len(racer.current_path) > racer.current_edge_index + 1:
             next_vertex = racer.current_path[racer.current_edge_index + 1]
         else:
@@ -281,6 +329,10 @@ class RaceEngine:
             racer.current_edge_index = 0
             racer.edge_progress = 0.0
             next_vertex = plan["path"][1]
+        if plan.get("planned_blocked"):
+            racer.dnf = True
+            racer.decision_log.append("planned_route_blocked")
+            return
         edge = self.graph.edge_between(racer.current_vertex, next_vertex)
         if edge is None or not edge.traversable():
             racer.current_path = []
@@ -340,6 +392,7 @@ class RaceEngine:
         racer.total_time += dt
         racer.edge_progress += progress
         if racer.edge_progress >= 1.0 - 1e-9:
+            source_vertex = racer.current_vertex
             racer.fuel = max(0.0, racer.fuel)
             racer.current_vertex = next_vertex
             racer.current_edge_index = 0
@@ -348,6 +401,11 @@ class RaceEngine:
             racer.selected_exit = None
             racer.exit_confirmed = False
             racer.decision_log.append(f"move_{edge.id}")
+            if racer.is_human and self.player_route:
+                for position in range(racer.planned_route_index, len(self.player_route) - 1):
+                    if self.player_route[position] == source_vertex and self.player_route[position + 1] == next_vertex:
+                        racer.planned_route_index = position + 1
+                        break
             self._consume_vertex_actions(racer)
 
     def _player(self) -> Racer | None:
@@ -364,6 +422,11 @@ class RaceEngine:
     def available_player_exits(self) -> list[int]:
         racer = self._player()
         if racer is None or racer.finished or racer.dnf:
+            return []
+        if self.player_route:
+            planned = self._planned_player_plan(racer)
+            if planned and not planned.get("planned_blocked"):
+                return [planned["path"][1]]
             return []
         return [target for target, edge in self.graph.neighbors(racer.current_vertex) if edge.traversable()]
 

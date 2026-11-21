@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,16 @@ DEFAULT_SETTINGS = {
     "sfx_volume": 0.8,
     "effects": True,
 }
+
+
+def _json_default(value: Any):
+    if is_dataclass(value):
+        return asdict(value)
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, set):
+        return sorted(value)
+    raise TypeError(f"Cannot persist {type(value).__name__}")
 
 
 @dataclass
@@ -137,7 +148,7 @@ class GameSession:
             }
         )
         temporary = self.state_path.with_suffix(self.state_path.suffix + ".tmp")
-        temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        temporary.write_text(json.dumps(payload, indent=2, default=_json_default) + "\n", encoding="utf-8")
         temporary.replace(self.state_path)
 
     def start_new_championship(self) -> None:
@@ -187,15 +198,14 @@ class GameSession:
         }
         config["race_id"] = f"quick-{track_id}-{self.race_sequence}"
         self.quick_race_config = config
-        self.route_plan = {
+        # A setup selection is not a route plan. Track Explorer must create and
+        # validate the route before a Racing View can be opened.
+        self.route_plan = None
+        self.explorer_mode = "full_race"
+        self.explorer_context = {
             "track_id": track_id,
-            "algorithm": "Dijkstra",
             "preset": str(config.get("routing", "Balanced")).lower(),
-            "source": self.selected_track.start_id,
-            "destination": self.selected_track.finish_id,
-            "checkpoint_aware": True,
-            "race_mode": "quick",
-            "race_id": config["race_id"],
+            "explorer_mode": "full_race",
         }
         self.explorer_return = "quick_setup"
         self.save_state()
@@ -217,16 +227,14 @@ class GameSession:
             "race_id": f"championship-{self.championship_index + 1}-{self.race_sequence}",
         }
         self.quick_race_config = config
-        self.route_plan = {
+        # Each championship round gets a fresh planning session on its own
+        # circuit. The route is populated only by Track Explorer confirmation.
+        self.route_plan = None
+        self.explorer_mode = "full_race"
+        self.explorer_context = {
             "track_id": self.selected_track_id,
-            "algorithm": "Dijkstra",
             "preset": "balanced",
-            "source": self.selected_track.start_id,
-            "destination": self.selected_track.finish_id,
-            "checkpoint_aware": True,
-            "race_mode": "championship",
-            "round_index": self.championship_index,
-            "race_id": config["race_id"],
+            "explorer_mode": "full_race",
         }
         self.explorer_return = "dashboard"
         self.save_state()
