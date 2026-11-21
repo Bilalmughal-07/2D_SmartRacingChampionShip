@@ -77,6 +77,7 @@ class AlgorithmComparisonView(ArcadeView):
         self.preset = "balanced"
         self.event_scenario = "Live graph"
         self.capacity = 10
+        self.chart_metric = "Auto"
         self.graph_revision = 0
         self.comparison: dict | None = None
         self.step_index = 0
@@ -154,7 +155,8 @@ class AlgorithmComparisonView(ArcadeView):
             self.add_button("PREVIOUS", 642, input_y, 92, 32, self.previous_step, NAVY, WHITE, CYAN, font_size=10)
             self.add_button("NEXT STEP", 740, input_y, 92, 32, self.next_step, NAVY, WHITE, CYAN, font_size=10)
             self.add_button("SPEED", 838, input_y, 72, 32, self.cycle_speed, NAVY, WHITE, CYAN, font_size=10)
-            self.add_button("EXPORT", 916, input_y, 78, 32, self.export_comparison, NAVY, WHITE, CYAN, font_size=10)
+            self.add_button(f"METRIC: {self._chart_metric_short()}", 916, input_y, 130, 32, self.cycle_chart_metric, NAVY, WHITE, CYAN, font_size=9)
+            self.add_button("EXPORT", 1052, input_y, 78, 32, self.export_comparison, NAVY, WHITE, CYAN, font_size=10)
         else:
             self.add_button("EXPORT", 514, input_y, 78, 32, self.export_comparison, NAVY, WHITE, CYAN, font_size=10)
         bottom = self.workspace_rect[1]
@@ -178,6 +180,7 @@ class AlgorithmComparisonView(ArcadeView):
         self.category_index = (self.category_index + 1) % len(_CATEGORY_ORDER)
         self.category = _CATEGORY_ORDER[self.category_index]
         self.algorithm1, self.algorithm2 = self.options[:2]
+        self.chart_metric = "Auto"
         self._invalidate(f"Category changed to {self.category}; both algorithms were reset to valid independent choices.")
 
     def cycle_algorithm1(self) -> None:
@@ -221,6 +224,47 @@ class AlgorithmComparisonView(ArcadeView):
         self.playback_speed = self.SPEEDS[(self.SPEEDS.index(self.playback_speed) + 1) % len(self.SPEEDS)]
         self.status = f"Playback speed: {self.playback_speed:g}×. Each trace keeps its own step count."
         self.rebuild_ui()
+
+    def cycle_chart_metric(self) -> None:
+        metrics = self._chart_metric_options()
+        self.chart_metric = metrics[(metrics.index(self.chart_metric) + 1) % len(metrics)]
+        self.status = f"Chart metric: {self._chart_metric_name()}. Both panels use the same scale."
+        self.rebuild_ui()
+
+    def _chart_metric_options(self):
+        options = {
+            "Graph Traversal": ("Auto", "Operation count", "Visited vertices", "Examined edges"),
+            "Weighted Routing": ("Auto", "Expanded vertices", "Heap operations", "Runtime"),
+            "Resource Optimization": ("Auto", "Total benefit", "States evaluated", "Decision count"),
+            "Championship Sorting": ("Auto", "Comparisons", "Swaps", "Moves"),
+        }
+        return options[self.category]
+
+    def _chart_metric_name(self):
+        if self.chart_metric != "Auto":
+            return self.chart_metric
+        return {
+            "Graph Traversal": "Operation count",
+            "Weighted Routing": "Expanded vertices",
+            "Resource Optimization": "Total benefit",
+            "Championship Sorting": "Comparisons",
+        }[self.category]
+
+    def _chart_metric_short(self):
+        return {
+            "Operation count": "Operations",
+            "Visited vertices": "Visited",
+            "Examined edges": "Edges",
+            "Expanded vertices": "Expanded",
+            "Heap operations": "Heap ops",
+            "Runtime": "Runtime",
+            "Total benefit": "Benefit",
+            "States evaluated": "States",
+            "Decision count": "Decisions",
+            "Comparisons": "Comparisons",
+            "Swaps": "Swaps",
+            "Moves": "Moves",
+        }.get(self._chart_metric_name(), self._chart_metric_name())
 
     def _show_revision(self) -> None:
         self.status = f"Both algorithms will receive isolated copies of graph revision {self.graph_revision}."
@@ -537,7 +581,8 @@ class AlgorithmComparisonView(ArcadeView):
         else:
             step = self._step_for(side)
             _text(f"{step['operation']}: {step.get('explanation', '')}", x + 12, y + height - 48, 9, WHITE, width=width - 24)
-        visual_y, visual_h = y + 84, height - 150
+        self._draw_metric_chart(item, x + 12, y + height - 86, width - 24)
+        visual_y, visual_h = y + 84, height - 178
         if name in {"BFS", "DFS", "Dijkstra", "A*"}:
             self._draw_graph_side(item, x + 10, visual_y, width - 20, visual_h)
         elif name in {"0/1 Knapsack DP", "Greedy"}:
@@ -601,6 +646,26 @@ class AlgorithmComparisonView(ArcadeView):
             x = left + 10 + index * (bar_w + 8)
             arcade.draw_lbwh_rectangle_filled(x, bottom + 18, bar_w, bar_h, CYAN if index < self.step_index else (51, 82, 105))
             _text(record["name"], x + bar_w / 2, bottom + 5, 7, WHITE, anchor_x="center")
+
+    def _draw_metric_chart(self, item, left, y, width):
+        metric = self._chart_metric_name()
+        values = [self._numeric_metric(side["metrics"].get(metric, 0)) for side in (self.comparison["left"], self.comparison["right"])]
+        maximum = max(values + [1.0])
+        _text(metric, left, y + 20, 8, AMBER, bold=True)
+        for index, value in enumerate(values):
+            bar_y = y + 7 - index * 10
+            color = CYAN if index == 0 else EMERALD
+            arcade.draw_lbwh_rectangle_filled(left + 88, bar_y, max(2, (width - 118) * value / maximum), 6, color)
+            _text(f"{'A' if index == 0 else 'B'} {value:g}", left + 2, bar_y - 1, 7, WHITE)
+
+    @staticmethod
+    def _numeric_metric(value):
+        if isinstance(value, (int, float)):
+            return float(value)
+        try:
+            return float(str(value).split()[0])
+        except (TypeError, ValueError):
+            return 0.0
 
     @staticmethod
     def _draw_metric_lines(metrics, left, bottom, width, limit):
