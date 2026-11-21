@@ -69,3 +69,12 @@ This ledger records evidence-backed work for the Smart Racing Championship final
 - The control now advances through the authoritative sorted graph edge IDs (`E0 → E1 → E2 …`) with wraparound, updates the selected-road highlight/details, and preserves graph revision, event history, route, zoom, and pan without applying an event.
 - Verification: direct Arcade callback smoke passed on `circuit_01`, `circuit_02`, and `circuit_03` with zoom/pan enabled; `docs/screenshots/arcade_explorer_events_next_1280.png` shows the post-click E12 selection.
 - Regression: `python -m pytest -q` → 47 passed; `python -m ruff check .` → passed.
+
+## 2026-11-21 — Algorithm Lab overhaul
+
+- Branch: `feat/phase-06-qa-release`; no PR or merge created.
+- Replaced the fixed dashboard with a responsive, real-data Algorithm Lab organized into five categories and backed by the production graph, resource, track-design, event-heap, and championship-sorting implementations.
+- Added trace hooks for DFS, Backtracking, Kruskal MST, and the three sorting implementations; existing result APIs remain backward compatible.
+- Added playback state, run/pause, previous/next, reset, speed selection, timeline seeking, pseudocode, explanations, complexity, counters, compare, experiment, export, help, circuit switching, source/target cycling, and context-aware Back navigation.
+- Visual QA: inspected logical 1280×720, 1600×900, and 1920×1080 captures plus distinct graph, DP, heap, and sorting category frames; corrected header navigation collision, panel label overlap, event constructor state, inspector result formatting, and compact timeline placement.
+- Verification: `python -m pytest -q` → 47 passed; `python -m ruff check .` → passed; 13 algorithm entries executed on all 3 circuits; control audit completed without errors.

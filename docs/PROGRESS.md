@@ -44,7 +44,17 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 - Championship Dashboard loads persistent standings, runs deterministic three-circuit previews when needed, supports Merge/Quick/Heap ranking, Top-3/Top-4 views, next-race continuation, podium, and shared scoring data.
 - Added CI workflow, release-oriented `.gitignore`, verification matrix, sprint/race handoff regression, 12-family catalog regression, and duplicate-safe championship persistence regression.
 - Rechecked actual Arcade captures after fixing header navigation collisions and dashboard footer overlap. Latest captures: `arcade_race_1280.png`, `arcade_lab_1280.png`, and `arcade_dashboard_1280.png`.
-- Final local verification: 39 tests passed; Ruff and compile checks passed; all three circuits validated; championship replay, five experiments, and technical report regenerated successfully.
+- Phase checkpoint verification: 39 tests passed; Ruff and compile checks passed; all three circuits validated; championship replay, five experiments, and technical report regenerated successfully. The later Algorithm Lab overhaul raised the current suite to 47 tests.
+
+## Algorithm Lab overhaul (2026-11-21)
+
+- Rebuilt `arcade_ui/lab_view.py` as a responsive, production-backed learning workspace with five category tabs: Graph & Routing, Optimization, Track Design, Events & Heaps, and Sorting.
+- Added real trace playback for BFS, DFS, Dijkstra, A*, 0/1 Knapsack DP, Refuelling DP, Greedy, Backtracking, Kruskal MST, Event Min-Heap, Merge Sort, Quick Sort, and Heap Sort. Refuelling DP is retained as the resource-planning extension to the 12 assignment families.
+- Added per-algorithm visualizations: live circuit graph, DP table, greedy benefit bars, binary heap tree/array, and championship ranking bars; every view exposes current state, counters, complexity, pseudocode, step explanation, and gameplay role.
+- Added responsive circuit/source/target/example controls, Previous/Next, Run/Pause, Reset, speed cycling, timeline seeking, compare, experiment, JSON export, help, keyboard navigation, and Back context restoration.
+- Added optional trace hooks to DFS, Backtracking, Kruskal MST, and Merge/Quick/Heap Sort while preserving their existing pure APIs and results.
+- Visual evidence inspected: `algorithm_lab_1280.png`, `algorithm_lab_1600.png`, `algorithm_lab_1920.png`, plus graph/DP/heap/sorting category captures. Logical 1280×720, 1600×900, and 1920×1080 layouts remain readable under Windows display scaling.
+- Verification after the overhaul: 47 tests passed, Ruff passed, all algorithm/circuit combinations executed without errors, and playback/compare/experiment controls completed successfully.
 
 ## Next actions
 

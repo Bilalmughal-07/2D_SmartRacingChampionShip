@@ -30,7 +30,10 @@ def knapsack_01(items: list[dict], budget: int) -> DPResult:
             b -= int(items[i - 1]["cost"])
     selected.reverse()
     return DPResult(
-        dp[-1][-1], selected, states=(len(items) + 1) * (budget + 1), details={"budget": budget}
+        dp[-1][-1],
+        selected,
+        states=(len(items) + 1) * (budget + 1),
+        details={"budget": budget, "table": dp},
     )
 
 

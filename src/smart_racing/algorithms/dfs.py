@@ -10,6 +10,7 @@ def dfs(
     target: int | None = None,
     max_paths: int = 20,
     max_path_length: int = 100,
+    trace=None,
 ) -> AlgorithmResult:
     result = AlgorithmResult()
     with Timer() as timer:
@@ -26,6 +27,8 @@ def dfs(
         discovery[start] = clock
         clock += 1
         order.append(start)
+        if trace:
+            trace.emit("discover", {"vertex": start, "stack": [start]}, result.counters)
         while stack:
             node, index, neighbors = stack[-1]
             if index >= len(neighbors):
@@ -34,13 +37,21 @@ def dfs(
                 clock += 1
                 if len(neighbors) == 0:
                     dead_ends.append(node)
+                    if trace:
+                        trace.emit("dead_end", {"vertex": node, "stack": [item[0] for item in stack]}, result.counters)
+                elif trace:
+                    trace.emit("backtrack", {"vertex": node, "stack": [item[0] for item in stack]}, result.counters)
                 continue
             neighbor, _edge = neighbors[index]
             stack[-1] = (node, index + 1, neighbors)
             result.counters.examined_edges += 1
+            if trace:
+                trace.emit("inspect_edge", {"from": node, "to": neighbor, "stack": [item[0] for item in stack]}, result.counters)
             if neighbor in visited:
                 if neighbor not in finish and parent.get(node) != neighbor:
                     cycle_edges.append((node, neighbor))
+                    if trace:
+                        trace.emit("cycle", {"from": node, "to": neighbor}, result.counters)
                 continue
             visited.add(neighbor)
             parent[neighbor] = node
@@ -48,6 +59,8 @@ def dfs(
             clock += 1
             order.append(neighbor)
             stack.append((neighbor, 0, graph.neighbors(neighbor)))
+            if trace:
+                trace.emit("discover", {"vertex": neighbor, "parent": node, "stack": [item[0] for item in stack]}, result.counters)
         result.counters.visited_vertices = len(visited)
         path: list[int] = []
         if target is not None and target in visited:

@@ -47,6 +47,10 @@ def test_algorithm_trace_is_optional_and_reusable():
     assert trace.steps
     assert trace.steps[0].operation == "extract_min"
 
+    dfs_trace = TraceCollector()
+    assert dfs(sample_graph(), 0, 4, trace=dfs_trace).path
+    assert dfs_trace.steps
+
 
 def test_blocked_edge_and_unreachable():
     graph = sample_graph()
@@ -76,6 +80,13 @@ def test_refuel_and_backtracking_and_mst():
     mst = kruskal_mst([0, 1, 2], [(0, 1, 1), (1, 2, 2), (0, 2, 4)])
     assert mst["is_tree"] and mst["total_weight"] == 3
 
+    placement_trace = TraceCollector()
+    assert place_services_backtracking(list(range(10)), {1, 2, 3}, 2, trace=placement_trace).valid
+    assert placement_trace.steps
+    mst_trace = TraceCollector()
+    kruskal_mst([0, 1, 2], [(0, 1, 1), (1, 2, 2), (0, 2, 4)], trace=mst_trace)
+    assert {step.operation for step in mst_trace.steps} == {"accept", "reject_cycle"}
+
 
 def test_all_sorts_and_top_k_match():
     values = [
@@ -103,3 +114,8 @@ def test_all_sorts_and_top_k_match():
     assert quick_sort(values, key=key) == expected
     assert heap_sort(values, key=key) == expected
     assert top_k(values, 3, key=key) == expected[:3]
+
+    for sorter in (merge_sort, quick_sort, heap_sort):
+        trace = []
+        assert sorter(values, key=key, trace=lambda operation, state: trace.append(operation)) == expected
+        assert trace

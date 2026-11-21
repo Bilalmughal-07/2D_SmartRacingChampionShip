@@ -285,7 +285,7 @@ def test_explorer_next_road_cycles_all_circuit_edges_in_id_order_with_wraparound
 
 
 def test_arcade_phase_views_expose_all_required_algorithm_families():
-    assert len(CATALOG) == 12
+    assert len(CATALOG) == 13
     assert [name for name, *_ in CATALOG] == [
         "BFS",
         "DFS",
@@ -298,7 +298,8 @@ def test_arcade_phase_views_expose_all_required_algorithm_families():
         "Kruskal MST",
         "Event Min-Heap",
         "Merge Sort",
-        "Quick/Heap Sort",
+        "Quick Sort",
+        "Heap Sort",
     ]
 
 

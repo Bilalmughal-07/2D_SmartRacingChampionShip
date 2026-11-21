@@ -23,12 +23,17 @@ class UnionFind:
         return True
 
 
-def kruskal_mst(vertices: list[int], edges: list[tuple[int, int, float]]) -> dict:
+def kruskal_mst(vertices: list[int], edges: list[tuple[int, int, float]], trace=None) -> dict:
     uf = UnionFind(vertices)
     chosen = []
     total = 0.0
     for source, target, weight in sorted(edges, key=lambda e: (e[2], e[0], e[1])):
-        if uf.union(source, target):
+        accepted = uf.union(source, target)
+        if trace:
+            from smart_racing.algorithms.common import Counters
+
+            trace.emit("accept" if accepted else "reject_cycle", {"edge": (source, target), "weight": weight, "accepted": len(chosen)}, Counters(examined_edges=len(chosen) + 1))
+        if accepted:
             chosen.append((source, target, weight))
             total += weight
     return {
