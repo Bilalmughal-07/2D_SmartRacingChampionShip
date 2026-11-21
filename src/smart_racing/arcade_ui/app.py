@@ -1177,6 +1177,10 @@ class TrackExplorerView(ArcadeView):
             self.status_color = CORAL
             return
         edge = self.graph.edges[self.event_edge_id]
+        if edge.status == status:
+            self.status_message = f"Road {edge.id} is already {status.value}; no preview change was recorded."
+            self.status_color = MUTED
+            return
         self.event_history.append((edge.id, edge.status))
         edge.status = status
         self.graph_revision += 1
@@ -1545,17 +1549,35 @@ class TrackExplorerView(ArcadeView):
             if selected in self.graph.edges:
                 edge = self.graph.edges[selected]
                 source, target = self.graph.vertices[edge.from_id], self.graph.vertices[edge.to_id]
-                lines = [
-                    f"Selected road E{edge.id}: V{edge.from_id} → V{edge.to_id} ({'one-way' if edge.directed else 'two-way'})",
-                    f"Distance {edge.distance:.1f}  time {edge.effective_time():.1f}s  fuel {edge.effective_fuel():.1f}  difficulty {edge.effective_difficulty()}",
-                    f"Shortcut: {'YES' if edge.is_shortcut else 'NO'}   Current status: {edge.status.value}",
-                    f"Geometry: ({source.x:.0f},{source.y:.0f}) → ({target.x:.0f},{target.y:.0f})",
-                ]
-                for index, line in enumerate(lines):
-                    _text(line, left + 24, bottom + panel_height - 96 - index * 30, 12, WHITE if index < 2 else MUTED)
+                on_route = bool(self.route_result and edge.id in self.route_result.get("metrics", {}).get("edge_ids", []))
+                status_color = {
+                    EdgeStatus.OPEN: EMERALD,
+                    EdgeStatus.RESTRICTED: AMBER,
+                    EdgeStatus.BLOCKED: CORAL,
+                }.get(edge.status, MUTED)
+                _text("SELECTED ROAD", left + 24, bottom + panel_height - 92, 10, CYAN, bold=True)
+                _text(f"E{edge.id}   V{edge.from_id} → V{edge.to_id}", left + 24, bottom + panel_height - 118, 16, WHITE, bold=True)
+                _text(f"{'ONE-WAY' if edge.directed else 'TWO-WAY'}   {edge.distance:.1f} m   {edge.effective_time():.1f} s   fuel {edge.effective_fuel():.1f}", left + 24, bottom + panel_height - 145, 12, MUTED)
+                _text(f"Current status: {edge.status.value.upper()}", left + 24, bottom + panel_height - 173, 12, status_color, bold=True)
+                _text(f"Shortcut: {'YES' if edge.is_shortcut else 'NO'}   On active route: {'YES' if on_route else 'NO'}", left + 24, bottom + panel_height - 199, 12, MUTED)
+                _text(f"Geometry: ({source.x:.0f}, {source.y:.0f}) → ({target.x:.0f}, {target.y:.0f})", left + 24, bottom + panel_height - 225, 11, MUTED)
             else:
-                _text("Click any road on the map to select it for a temporary event.", left + 24, bottom + panel_height - 100, 14, AMBER)
-            _text("Preview events affect only this Explorer graph copy. The canonical circuit and active race are unchanged.", left + 24, bottom + 106, 11, MUTED, width=panel_width - 48)
+                _text("No road selected", left + 24, bottom + panel_height - 112, 16, AMBER, bold=True)
+                _text("Click any road on the map to select it for a temporary event.", left + 24, bottom + panel_height - 142, 12, MUTED)
+            right = left + panel_width * 0.56
+            _text("EVENT WORKFLOW", right, bottom + panel_height - 92, 10, CYAN, bold=True)
+            workflow = [
+                "1  Click a road on the map",
+                "2  Close, reopen, or restrict it",
+                "3  Recalculate to refresh the route",
+            ]
+            for index, line in enumerate(workflow):
+                _text(line, right, bottom + panel_height - 121 - index * 25, 12, WHITE)
+            _text("PREVIEW STATE", right, bottom + panel_height - 211, 10, CYAN, bold=True)
+            _text(f"Temporary changes: {len(self.event_history)}", right, bottom + panel_height - 237, 12, MUTED)
+            _text(f"Graph revision: {self.graph_revision}", right, bottom + panel_height - 262, 12, MUTED)
+            _text(f"Route status: {self.route_state.replace('_', ' ')}", right, bottom + panel_height - 287, 12, self.status_color)
+            _text("Explorer-only copy; the canonical track and active race remain unchanged.", left + 24, bottom + 106, 11, MUTED, width=panel_width - 48)
         elif self.modal == "checkpoint":
             _text("Full Race Plan requires this ordered sequence on every lap:", left + 24, bottom + panel_height - 92, 14, CYAN)
             sequence = "START  →  " + "  →  ".join(f"CP{self.track.vertices[next(i for i, vertex in enumerate(self.track.vertices) if vertex.id == checkpoint)].checkpoint_order}" for checkpoint in self.track.checkpoint_ids) + "  →  FINISH"
