@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import textwrap
+from dataclasses import replace
 
 import arcade
 
@@ -17,6 +19,7 @@ from smart_racing.arcade_ui.app import (
     _clamp,
     _text,
 )
+from smart_racing.config import DEFAULT_CONFIG
 from smart_racing.model.graph import EdgeStatus, VertexType
 from smart_racing.services.race_engine import RaceEngine
 
@@ -24,10 +27,20 @@ from smart_racing.services.race_engine import RaceEngine
 class ArcadeRacingView(ArcadeView):
     """Playable Arcade race presentation backed by the authoritative RaceEngine."""
 
-    def __init__(self, window, session):
+    def __init__(self, window, session, race_config: dict | None = None):
         self.track = session.selected_track
         self.route_config = dict(session.route_plan or {})
-        self.engine = RaceEngine(self.track, route_config=self.route_config)
+        self.race_config = dict(race_config or session.quick_race_config or {})
+        laps = int(self.race_config.get("laps", self.track.laps))
+        time_limit = float(self.race_config.get("time_limit", self.track.time_limit))
+        config = replace(DEFAULT_CONFIG, laps=max(1, laps), race_time_limit=max(30.0, time_limit))
+        self.engine = RaceEngine(
+            self.track,
+            config=config,
+            route_config=self.route_config,
+            events_enabled=bool(self.race_config.get("events_enabled", True)),
+            ai_difficulty=str(self.race_config.get("ai_difficulty", "Normal")),
+        )
         self.paused = False
         self.camera_mode = "FOLLOW"
         self.show_minimap = True
@@ -68,6 +81,16 @@ class ArcadeRacingView(ArcadeView):
         self.app.show_view(TrackExplorerView(self.app, self.session))
 
     def open_dashboard(self) -> None:
+        if self.results and self.session.mode == "quick":
+            from smart_racing.arcade_ui.race_modes_view import QuickRaceResultsView
+
+            self.app.show_view(QuickRaceResultsView(self.app, self.session))
+            return
+        if self.results and self.session.mode == "championship":
+            from smart_racing.arcade_ui.race_modes_view import ChampionshipResultsView
+
+            self.app.show_view(ChampionshipResultsView(self.app, self.session, championship=True))
+            return
         from smart_racing.arcade_ui.dashboard_view import ChampionshipDashboardView
 
         self.app.show_view(ChampionshipDashboardView(self.app, self.session))
@@ -101,7 +124,13 @@ class ArcadeRacingView(ArcadeView):
         self.status_message = "Route exit confirmed." if self.engine.confirm_player_exit() else "Select an open outgoing road before confirming."
 
     def restart(self) -> None:
-        self.engine = RaceEngine(self.track, route_config=self.route_config)
+        self.engine = RaceEngine(
+            self.track,
+            config=self.engine.config,
+            route_config=self.route_config,
+            events_enabled=self.engine.events_enabled,
+            ai_difficulty=self.engine.ai_difficulty,
+        )
         self.results = None
         self.results_recorded = False
         self.paused = False
@@ -127,7 +156,14 @@ class ArcadeRacingView(ArcadeView):
         if self.engine.state.finished:
             self.results = self.engine.run(max_ticks=1)
             self._record_results()
-            self.rebuild_ui()
+            if self.session.mode == "championship":
+                from smart_racing.arcade_ui.race_modes_view import ChampionshipResultsView
+
+                self.app.show_view(ChampionshipResultsView(self.app, self.session, championship=True))
+            else:
+                from smart_racing.arcade_ui.race_modes_view import QuickRaceResultsView
+
+                self.app.show_view(QuickRaceResultsView(self.app, self.session))
 
     def _record_results(self) -> None:
         if self.results_recorded or not self.results:
@@ -137,7 +173,12 @@ class ArcadeRacingView(ArcadeView):
 
     def on_key_press(self, symbol: int, modifiers: int):
         if symbol == arcade.key.ESCAPE:
-            self.open_explorer()
+            if self.session.mode == "quick" and not self.results:
+                from smart_racing.arcade_ui.race_modes_view import QuickRaceSetupView
+
+                self.app.show_view(QuickRaceSetupView(self.app, self.session))
+            else:
+                self.open_explorer()
             return
         if symbol in (arcade.key.W, arcade.key.UP, arcade.key.S, arcade.key.DOWN):
             self.pressed.add(symbol)
@@ -336,7 +377,7 @@ class ArcadeRacingView(ArcadeView):
         player = self.engine._player()
         if player:
             lines = [
-                f"LAP {min(player.lap + 1, self.track.laps)}/{self.track.laps}",
+                f"LAP {min(player.lap + 1, self.engine.config.laps)}/{self.engine.config.laps}",
                 f"CHECKPOINT {min(player.next_checkpoint + 1, len(self.track.checkpoint_ids))}/10",
                 f"FUEL {player.fuel:05.1f} / 100",
                 f"NITRO {player.nitro_charges}  {'ACTIVE' if player.active_nitro else ''}",
@@ -349,13 +390,15 @@ class ArcadeRacingView(ArcadeView):
             selected = player.selected_exit
             options = self.engine.available_player_exits()
             _text(f"EXITS {options}  SELECTED {selected if selected is not None else 'AUTO'}", left + 14, bottom + height - 280, 10, AMBER if selected is not None else MUTED)
-        _text(self.status_message, left + 14, bottom + 202, 11, AMBER if "unavailable" in self.status_message or "only" in self.status_message else MUTED, width=width - 28)
+        status_color = AMBER if "unavailable" in self.status_message or "only" in self.status_message else MUTED
+        for index, line in enumerate(textwrap.wrap(self.status_message, width=42)[:2]):
+            _text(line, left + 14, bottom + 202 - index * 16, 10, status_color)
         _text("W/UP speed   S/DOWN brake", left + 14, bottom + 172, 10, MUTED)
         _text("A/D fork   ENTER confirm   SPACE nitro", left + 14, bottom + 153, 10, MUTED)
         _text("SHIFT sprint   R refuel   C camera   P pause", left + 14, bottom + 134, 10, MUTED)
-        _text("EVENT FEED", left + 14, bottom + 390, 12, WHITE, bold=True)
+        _text("EVENT FEED", left + 14, bottom + 318, 12, WHITE, bold=True)
         for index, event in enumerate(self.engine.state.event_log[-4:]):
-            _text(event.replace("target=", "edge ")[:36], left + 14, bottom + 366 - index * 18, 10, CORAL if "block" in event else MUTED)
+            _text(event.replace("target=", "edge ")[:36], left + 14, bottom + 294 - index * 18, 10, CORAL if "block" in event else MUTED)
         if self.results:
             arcade.draw_lbwh_rectangle_filled(left + 10, bottom + 225, width - 20, 105, (5, 18, 28, 240))
             _text("RACE FINISHED", left + width / 2, bottom + 304, 18, EMERALD, anchor_x="center", bold=True)

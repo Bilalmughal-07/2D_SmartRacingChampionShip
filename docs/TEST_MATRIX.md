@@ -13,6 +13,8 @@ The project uses deterministic tests plus real Arcade/Pygame smoke captures. A f
 | Racing Screen | race replay/control/sprint tests | `arcade_race_1280.png` | Pass |
 | Algorithm Lab | catalog/session tests, comparison-selection tests, trace-hook tests, algorithm unit suite, direct 13-entry × 3-circuit and four-category comparison audit | `algorithm_lab_1280.png`, `algorithm_lab_1600.png`, `algorithm_lab_1920.png`, graph/DP/heap/sorting captures, `algorithm_comparison_weighted_1280.png` | Pass |
 | Championship Dashboard | scoring/championship tests | `arcade_dashboard_1280.png` | Pass |
+| Quick Race setup/results | session configuration and no-point-mutation tests; three-circuit engine smoke | `quick_setup_1280.png`, `quick_setup_1600.png`, `quick_results_populated_1280.png` | Pass |
+| Championship lifecycle | duplicate-safe round persistence and three-round simulation | `championship_dashboard_1280.png`, `championship_dashboard_1600.png`, `championship_results_1280.png` | Pass |
 | Release path | build scripts and clean extraction smoke | report, executable, ZIP manifest | Re-run after final edits |
 
 ## Required smoke commands
@@ -30,6 +32,8 @@ python run_arcade.py --smoke --screen explorer --width 1280 --height 720 --outpu
 python run_arcade.py --smoke --screen race --width 1280 --height 720 --output docs/screenshots/arcade_race_1280.png
 python run_arcade.py --smoke --screen lab --width 1280 --height 720 --output docs/screenshots/arcade_lab_1280.png
 python run_arcade.py --smoke --screen dashboard --width 1280 --height 720 --output docs/screenshots/arcade_dashboard_1280.png
+python run_arcade.py --smoke --screen quick_setup --width 1280 --height 720 --output docs/screenshots/quick_setup_1280.png
+python run_arcade.py --smoke --screen championship_results --width 1280 --height 720 --output docs/screenshots/championship_results_1280.png
 ```
 
 The Arcade smoke backend may report a higher physical framebuffer on Windows display scaling; the logical window size remains the requested size and the image is inspected at the actual captured dimensions.

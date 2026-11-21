@@ -91,6 +91,18 @@ class ArcadeApp(arcade.Window):
             self.show_view(ArcadeRacingView(self, session))
         elif initial_screen == "dashboard":
             self.show_view(ChampionshipDashboardView(self, session))
+        elif initial_screen == "quick_setup":
+            from smart_racing.arcade_ui.race_modes_view import QuickRaceSetupView
+
+            self.show_view(QuickRaceSetupView(self, session))
+        elif initial_screen == "quick_results":
+            from smart_racing.arcade_ui.race_modes_view import QuickRaceResultsView
+
+            self.show_view(QuickRaceResultsView(self, session))
+        elif initial_screen == "championship_results":
+            from smart_racing.arcade_ui.race_modes_view import ChampionshipResultsView
+
+            self.show_view(ChampionshipResultsView(self, session, championship=True))
         elif initial_screen == "circuits":
             self.show_view(CircuitSelectionView(self, session))
         else:
@@ -185,6 +197,10 @@ class ArcadeView(arcade.View):
         target = self.session.explorer_return
         if target == "circuit_selection":
             self.app.show_view(CircuitSelectionView(self.app, self.session))
+        elif target == "quick_setup":
+            from smart_racing.arcade_ui.race_modes_view import QuickRaceSetupView
+
+            self.app.show_view(QuickRaceSetupView(self.app, self.session))
         elif target == "dashboard":
             from smart_racing.arcade_ui.dashboard_view import ChampionshipDashboardView
 
@@ -267,15 +283,13 @@ class MainMenuView(ArcadeView):
 
     def activate(self, action: str) -> None:
         if action == "championship":
-            if self.session.has_saved_championship:
-                self.open_modal("championship")
-            else:
-                self.session.start_new_championship()
-                self.session.explorer_mode = "full_race"
-                self.session.explorer_return = "menu"
-                self.show_explorer()
+            from smart_racing.arcade_ui.dashboard_view import ChampionshipDashboardView
+
+            self.window.show_view(ChampionshipDashboardView(self.app, self.session))
         elif action == "quick":
-            self.window.show_view(CircuitSelectionView(self.app, self.session))
+            from smart_racing.arcade_ui.race_modes_view import QuickRaceSetupView
+
+            self.window.show_view(QuickRaceSetupView(self.app, self.session))
         elif action == "explorer":
             self.session.mode = "quick"
             self.session.explorer_mode = "free"
@@ -309,10 +323,16 @@ class MainMenuView(ArcadeView):
         button_width = min(190, (panel_width - 70) / 3)
         button_height = 44
         if self.modal == "championship":
-            labels = [("CONTINUE", self.session.continue_championship, CYAN), ("NEW", self.session.start_new_championship, EMERALD), ("CANCEL", self.close_modal, NAVY)]
+            from smart_racing.arcade_ui.dashboard_view import ChampionshipDashboardView
+
+            labels = [
+                ("CONTINUE", self.session.continue_championship, CYAN),
+                ("NEW", self.session.start_new_championship, EMERALD),
+                ("CANCEL", self.close_modal, NAVY),
+            ]
             y = bottom + 42
             for index, (label, callback, fill) in enumerate(labels):
-                callback = self._then(callback, self.show_explorer) if label != "CANCEL" else callback
+                callback = self._then(callback, lambda: self.window.show_view(ChampionshipDashboardView(self.app, self.session))) if label != "CANCEL" else callback
                 self.add_button(label, left + 24 + index * (button_width + 10), y, button_width, button_height, callback, fill, NAVY if fill != NAVY else WHITE, CYAN if fill == NAVY else fill)
         elif self.modal == "instructions":
             self.add_button("CLOSE", left + 24, bottom + 28, 170, button_height, self.close_modal, CYAN, NAVY, CYAN)

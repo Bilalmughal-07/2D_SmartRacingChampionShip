@@ -41,6 +41,8 @@ class GameSession:
     explorer_mode: str = "full_race"
     explorer_return: str = "menu"
     explorer_context: dict[str, Any] = field(default_factory=dict)
+    quick_race_config: dict[str, Any] = field(default_factory=dict)
+    race_sequence: int = 0
 
     @classmethod
     def create(cls, tracks: list[Any], root: Path | None = None) -> "GameSession":
@@ -89,6 +91,8 @@ class GameSession:
                     self.explorer_mode = str(stored.get("explorer_mode", self.explorer_mode))
                     self.explorer_return = str(stored.get("explorer_return", self.explorer_return))
                     self.explorer_context = dict(stored.get("explorer_context", {}))
+                    self.quick_race_config = dict(stored.get("quick_race_config", {}))
+                    self.race_sequence = int(stored.get("race_sequence", 0))
             except (OSError, ValueError, TypeError):
                 self.championship_in_progress = False
 
@@ -126,7 +130,15 @@ class GameSession:
             "explorer_return": self.explorer_return,
             "explorer_context": self.explorer_context,
         }
-        self.state_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        payload.update(
+            {
+                "quick_race_config": self.quick_race_config,
+                "race_sequence": self.race_sequence,
+            }
+        )
+        temporary = self.state_path.with_suffix(self.state_path.suffix + ".tmp")
+        temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(self.state_path)
 
     def start_new_championship(self) -> None:
         self.mode = "championship"
@@ -146,6 +158,7 @@ class GameSession:
         self.explorer_mode = "full_race"
         self.explorer_return = "menu"
         self.explorer_context = {}
+        self.quick_race_config = {}
         self.save_state()
 
     def continue_championship(self) -> None:
@@ -159,6 +172,65 @@ class GameSession:
             self.explorer_return = "dashboard"
             self.explorer_context = {}
             self.save_state()
+
+    def configure_quick_race(self, track_id: str, **settings: Any) -> dict[str, Any]:
+        """Persist the standalone race setup and return its immutable launch config."""
+        self.select_quick_race(track_id)
+        self.race_sequence += 1
+        config = {
+            "laps": 2,
+            "ai_difficulty": "Normal",
+            "events_enabled": True,
+            "routing": "Balanced",
+            "race_mode": "quick",
+            **settings,
+        }
+        config["race_id"] = f"quick-{track_id}-{self.race_sequence}"
+        self.quick_race_config = config
+        self.route_plan = {
+            "track_id": track_id,
+            "algorithm": "Dijkstra",
+            "preset": str(config.get("routing", "Balanced")).lower(),
+            "source": self.selected_track.start_id,
+            "destination": self.selected_track.finish_id,
+            "checkpoint_aware": True,
+            "race_mode": "quick",
+            "race_id": config["race_id"],
+        }
+        self.explorer_return = "quick_setup"
+        self.save_state()
+        return dict(config)
+
+    def prepare_championship_race(self) -> dict[str, Any]:
+        if not self.has_saved_championship:
+            raise ValueError("No championship round is available")
+        self.mode = "championship"
+        self.selected_track_id = self.tracks[self.championship_index].id
+        self.race_sequence += 1
+        config = {
+            "laps": int(self.selected_track.laps),
+            "ai_difficulty": "Normal",
+            "events_enabled": True,
+            "routing": "Balanced",
+            "race_mode": "championship",
+            "round_index": self.championship_index,
+            "race_id": f"championship-{self.championship_index + 1}-{self.race_sequence}",
+        }
+        self.quick_race_config = config
+        self.route_plan = {
+            "track_id": self.selected_track_id,
+            "algorithm": "Dijkstra",
+            "preset": "balanced",
+            "source": self.selected_track.start_id,
+            "destination": self.selected_track.finish_id,
+            "checkpoint_aware": True,
+            "race_mode": "championship",
+            "round_index": self.championship_index,
+            "race_id": config["race_id"],
+        }
+        self.explorer_return = "dashboard"
+        self.save_state()
+        return dict(config)
 
     def select_quick_race(self, track_id: str) -> None:
         if not any(track.id == track_id for track in self.tracks):
@@ -183,7 +255,16 @@ class GameSession:
         if race_id in self.completed_races:
             return False
         self.last_results = [result.__dict__.copy() for result in results]
-        self.race_history.append({"track_id": track_id, "race_id": race_id, "results": self.last_results})
+        mode = "championship" if self.mode == "championship" else "quick"
+        self.race_history.append(
+            {
+                "track_id": track_id,
+                "race_id": race_id,
+                "mode": mode,
+                "round_index": self.championship_index if mode == "championship" else None,
+                "results": self.last_results,
+            }
+        )
         if self.mode == "championship":
             entries = {
                 int(key): ChampionshipEntry(**value)

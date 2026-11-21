@@ -11,7 +11,13 @@
           "fastest_lap": 21.30000000000007,
           "bonus_points": 0,
           "points_awarded": 25,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 19.364,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 5,
+          "mode": "",
+          "round_index": null
         },
         {
           "race_id": "circuit_01",
@@ -21,7 +27,13 @@
           "fastest_lap": 21.50000000000006,
           "bonus_points": 0,
           "points_awarded": 18,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 23.656,
+          "nitro_used": 2,
+          "completed_checkpoints": 30,
+          "event_count": 5,
+          "mode": "",
+          "round_index": null
         },
         {
           "race_id": "circuit_01",
@@ -31,7 +43,13 @@
           "fastest_lap": 21.50000000000006,
           "bonus_points": 0,
           "points_awarded": 15,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 23.656,
+          "nitro_used": 2,
+          "completed_checkpoints": 30,
+          "event_count": 5,
+          "mode": "",
+          "round_index": null
         },
         {
           "race_id": "circuit_01",
@@ -41,7 +59,13 @@
           "fastest_lap": 25.499999999999833,
           "bonus_points": 0,
           "points_awarded": 12,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 19.317,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 5,
+          "mode": "",
+          "round_index": null
         }
       ],
       "events": [
@@ -63,7 +87,13 @@
           "fastest_lap": 32.59999999999943,
           "bonus_points": 0,
           "points_awarded": 25,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 32.691,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
         },
         {
           "race_id": "circuit_02",
@@ -73,7 +103,13 @@
           "fastest_lap": 36.1666666666659,
           "bonus_points": 0,
           "points_awarded": 18,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 39.651,
+          "nitro_used": 3,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
         },
         {
           "race_id": "circuit_02",
@@ -83,7 +119,13 @@
           "fastest_lap": 36.1666666666659,
           "bonus_points": 0,
           "points_awarded": 15,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 39.651,
+          "nitro_used": 3,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
         },
         {
           "race_id": "circuit_02",
@@ -93,7 +135,13 @@
           "fastest_lap": 38.99999999999907,
           "bonus_points": 0,
           "points_awarded": 12,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 32.6,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
         }
       ],
       "events": [
@@ -118,7 +166,13 @@
           "fastest_lap": 28.333333333333005,
           "bonus_points": 0,
           "points_awarded": 25,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 26.312,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
         },
         {
           "race_id": "circuit_03",
@@ -128,7 +182,13 @@
           "fastest_lap": 29.999999999999577,
           "bonus_points": 0,
           "points_awarded": 18,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 32.556,
+          "nitro_used": 3,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
         },
         {
           "race_id": "circuit_03",
@@ -138,7 +198,13 @@
           "fastest_lap": 29.999999999999577,
           "bonus_points": 0,
           "points_awarded": 15,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 32.556,
+          "nitro_used": 3,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
         },
         {
           "race_id": "circuit_03",
@@ -148,7 +214,13 @@
           "fastest_lap": 33.99999999999935,
           "bonus_points": 0,
           "points_awarded": 12,
-          "dnf": false
+          "dnf": false,
+          "fuel_used": 26.308,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
         }
       ],
       "events": [

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from types import SimpleNamespace
 
 from smart_racing.arcade_ui.app import MainMenuView, TrackExplorerView
@@ -10,6 +11,7 @@ from smart_racing.arcade_ui.comparison_view import (
 )
 from smart_racing.arcade_ui.lab_view import CATALOG
 from smart_racing.arcade_ui.session import DEFAULT_SETTINGS, GameSession
+from smart_racing.config import DEFAULT_CONFIG
 from smart_racing.model.graph import EdgeStatus
 from smart_racing.services.race_engine import RaceEngine
 from smart_racing.services.route_planner import RoutePlanner
@@ -331,3 +333,45 @@ def test_session_records_championship_races_once_and_advances_order(tmp_path):
     assert session.selected_track_id == tracks[1].id
     assert len(session.race_history) == 1
     assert session.championship_points["Player"] >= 0
+
+
+def test_quick_race_setup_persists_config_without_championship_points(tmp_path):
+    tracks = load_tracks()
+    session = GameSession.create(tracks, root=tmp_path)
+    config = session.configure_quick_race(
+        tracks[1].id,
+        laps=1,
+        ai_difficulty="Hard",
+        events_enabled=False,
+        routing="Speed",
+    )
+    engine = RaceEngine(
+        tracks[1],
+        config=replace(DEFAULT_CONFIG, laps=config["laps"]),
+        route_config=session.route_plan,
+        events_enabled=config["events_enabled"],
+        ai_difficulty=config["ai_difficulty"],
+    )
+    results = engine.run()
+    assert config["race_id"].startswith("quick-circuit_02-")
+    assert engine.config.laps == 1
+    assert not engine.state.event_log
+    assert results[0].mode == "quick"
+    assert session.record_race_results(tracks[1].id, results)
+    assert session.championship_points == {}
+    assert session.championship_index == 0
+
+
+def test_championship_round_config_is_unique_and_uses_next_track(tmp_path):
+    tracks = load_tracks()
+    session = GameSession.create(tracks, root=tmp_path)
+    session.start_new_championship()
+    first = session.prepare_championship_race()
+    assert first["race_mode"] == "championship"
+    assert first["round_index"] == 0
+    results = RaceEngine(tracks[0], route_config=session.route_plan).run()
+    assert session.record_race_results(tracks[0].id, results)
+    second = session.prepare_championship_race()
+    assert second["round_index"] == 1
+    assert second["race_id"] != first["race_id"]
+    assert session.selected_track_id == tracks[1].id

@@ -27,9 +27,17 @@ class RaceEngine:
         config: GameConfig = DEFAULT_CONFIG,
         racers: list[Racer] | None = None,
         route_config: dict | None = None,
+        *,
+        events_enabled: bool = True,
+        ai_difficulty: str = "Normal",
     ):
         self.track = track
         self.config = config
+        self.events_enabled = bool(events_enabled)
+        self.ai_difficulty = str(ai_difficulty or "Normal").title()
+        self.ai_multiplier = {"Easy": 0.88, "Normal": 1.0, "Hard": 1.10}.get(
+            self.ai_difficulty, 1.0
+        )
         self.route_config = {
             "algorithm": "Dijkstra",
             "preset": "balanced",
@@ -53,7 +61,7 @@ class RaceEngine:
         # are visible to every route calculation and to the Algorithm Lab snapshot.
         self.planner.graph = self.graph
         self.scheduler = EventScheduler()
-        self.state = RaceState(track.id)
+        self.state = RaceState(str(self.route_config.get("race_id") or track.id))
         self.racers = racers or [
             Racer(
                 1,
@@ -93,7 +101,8 @@ class RaceEngine:
             ),
         ]
         self._next_event_id = 1
-        self._schedule_default_events()
+        if self.events_enabled:
+            self._schedule_default_events()
 
     def _schedule_default_events(self):
         events = [
@@ -211,7 +220,7 @@ class RaceEngine:
             )
             racer.lap += 1
             racer.lap_started_at = racer.total_time
-            if racer.lap >= self.track.laps:
+            if racer.lap >= self.config.laps:
                 racer.finished = True
             else:
                 racer.next_checkpoint = 0
@@ -285,6 +294,7 @@ class RaceEngine:
             )
             if racer.manual_nitro or auto_nitro:
                 racer.nitro_charges -= 1
+                racer.nitro_uses += 1
                 racer.active_nitro = True
                 racer.manual_nitro = False
                 racer.nitro_remaining = self.config.nitro_duration
@@ -302,7 +312,7 @@ class RaceEngine:
         if racer.strategy_type == RacerStrategy.HUMAN:
             control_multiplier = max(0.25, 0.55 + (0.65 * racer.throttle) - (0.45 * racer.brake))
         else:
-            control_multiplier = 1.0
+            control_multiplier = self.ai_multiplier
         if racer.active_nitro:
             racer.nitro_remaining = max(0.0, racer.nitro_remaining - dt)
             if racer.nitro_remaining <= 0:
@@ -326,6 +336,7 @@ class RaceEngine:
             return
         progress = min(1.0, dt / max(travel_time, 1e-9))
         racer.fuel -= fuel * progress
+        racer.fuel_used += fuel * progress
         racer.total_time += dt
         racer.edge_progress += progress
         if racer.edge_progress >= 1.0 - 1e-9:
@@ -416,7 +427,7 @@ class RaceEngine:
         for racer in self.racers:
             self._advance_racer(racer, dt)
         active = [r for r in self.racers if not r.finished and not r.dnf]
-        if not active or self.state.elapsed >= self.track.time_limit:
+        if not active or self.state.elapsed >= self.config.race_time_limit:
             self.state.finished = True
         return self.snapshot()
 
@@ -442,6 +453,12 @@ class RaceEngine:
                     racer.fastest_lap,
                     points_awarded=points_for_position(position) if racer.finished else 0,
                     dnf=racer.dnf,
+                    fuel_used=round(racer.fuel_used, 3),
+                    nitro_used=racer.nitro_uses,
+                    completed_checkpoints=(racer.lap * len(self.track.checkpoint_ids)) + racer.next_checkpoint,
+                    event_count=len(self.state.event_log),
+                    mode=str(self.route_config.get("race_mode") or ""),
+                    round_index=self.route_config.get("round_index"),
                 )
             )
         return results

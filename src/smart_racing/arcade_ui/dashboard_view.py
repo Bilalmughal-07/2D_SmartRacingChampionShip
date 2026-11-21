@@ -4,6 +4,7 @@ import arcade
 
 from smart_racing.arcade_ui.app import (
     AMBER,
+    CORAL,
     CYAN,
     EMERALD,
     MUTED,
@@ -14,8 +15,7 @@ from smart_racing.arcade_ui.app import (
     _text,
 )
 from smart_racing.model.race import ChampionshipEntry
-from smart_racing.services.race_engine import RaceEngine
-from smart_racing.services.scoring import rank_entries, record_results, top_k_entries
+from smart_racing.services.scoring import rank_entries, top_k_entries
 
 
 class ChampionshipDashboardView(ArcadeView):
@@ -25,7 +25,8 @@ class ChampionshipDashboardView(ArcadeView):
         self.sort_method = "merge"
         self.top_k = 3
         self.entries: list[ChampionshipEntry] = []
-        self.status = "Load standings or run the deterministic championship preview."
+        self.status = "Championship not started. Start a season to create persistent standings."
+        self.confirm_reset = False
         super().__init__(window, session)
         self.load_entries()
 
@@ -34,17 +35,14 @@ class ChampionshipDashboardView(ArcadeView):
             self.entries = [ChampionshipEntry(**value) for value in self.session.championship_entries.values()]
             self.status = f"Loaded {len(self.entries)} persistent standings entries."
         else:
-            self.run_preview()
+            self.entries = [
+                ChampionshipEntry(index, name)
+                for index, name in enumerate(("Player", "Navigator", "Shortcut", "Distance"), 1)
+            ]
 
     def run_preview(self) -> None:
-        entries = {
-            index: ChampionshipEntry(index, name)
-            for index, name in enumerate(("Player", "Navigator", "Shortcut", "Distance"), 1)
-        }
-        for track in self.session.tracks:
-            record_results(entries, RaceEngine(track).run())
-        self.entries = list(entries.values())
-        self.status = "Three-circuit deterministic championship review loaded."
+        """Compatibility action retained for old callers; it now starts a real season."""
+        self.start_championship()
 
     def rebuild_ui(self) -> None:
         self.clear_ui()
@@ -56,8 +54,10 @@ class ChampionshipDashboardView(ArcadeView):
         self.add_button("HEAP SORT", 412, nav_y, 132, 38, lambda: self.set_sort("heap"), CYAN if self.sort_method == "heap" else NAVY, NAVY if self.sort_method == "heap" else WHITE, CYAN)
         self.add_button("TOP 3", 554, nav_y, 98, 38, lambda: self.set_top_k(3), PURPLE if self.top_k == 3 else NAVY, WHITE, PURPLE)
         self.add_button("TOP 4", 662, nav_y, 98, 38, lambda: self.set_top_k(4), PURPLE if self.top_k == 4 else NAVY, WHITE, PURPLE)
-        self.add_button("RUN CHAMPIONSHIP", 24, 42, 220, 38, self.run_preview, EMERALD, NAVY, EMERALD)
-        self.add_button("NEXT RACE", 256, 42, 140, 38, self.next_race, CYAN, NAVY, CYAN)
+        start_label = "START CHAMPIONSHIP" if not self.session.championship_in_progress else "CONTINUE SEASON"
+        self.add_button(start_label, 24, 42, 220, 38, self.start_championship if not self.session.championship_in_progress else self.next_race, EMERALD, NAVY, EMERALD)
+        self.add_button("NEXT ROUND", 256, 42, 140, 38, self.next_race, CYAN, NAVY, CYAN)
+        self.add_button("RESET", 406, 42, 100, 38, self.request_reset, (84, 27, 39) if self.confirm_reset else NAVY, WHITE, CORAL)
 
     def go_menu(self) -> None:
         from smart_racing.arcade_ui.app import MainMenuView
@@ -74,22 +74,34 @@ class ChampionshipDashboardView(ArcadeView):
         self.status = f"Top-{count} view selected using the same ranking comparator."
         self.rebuild_ui()
 
+    def start_championship(self) -> None:
+        self.session.start_new_championship()
+        self.entries = [ChampionshipEntry(**value) for value in self.session.championship_entries.values()]
+        self.status = "New championship created. Round 1 is ready to launch."
+        self.confirm_reset = False
+        self.rebuild_ui()
+
+    def request_reset(self) -> None:
+        if not self.confirm_reset:
+            self.confirm_reset = True
+            self.status = "Reset will erase current points and race history. Press RESET again to confirm."
+            self.rebuild_ui()
+            return
+        self.start_championship()
+
     def next_race(self) -> None:
+        if not self.session.championship_in_progress:
+            self.start_championship()
         if self.session.mode != "championship" or self.session.championship_status == "COMPLETED":
             self.status = "No championship race is waiting; start or continue a championship from the main menu."
             return
         if self.session.championship_index >= len(self.session.tracks):
             self.status = "Championship complete: final champion is shown below."
             return
-        self.session.selected_track_id = self.session.tracks[self.session.championship_index].id
-        self.session.route_plan = None
-        self.session.explorer_mode = "full_race"
-        self.session.explorer_return = "dashboard"
-        self.session.explorer_context = {}
-        self.session.save_state()
-        from smart_racing.arcade_ui.app import TrackExplorerView
+        config = self.session.prepare_championship_race()
+        from smart_racing.arcade_ui.race_view import ArcadeRacingView
 
-        self.app.show_view(TrackExplorerView(self.app, self.session))
+        self.app.show_view(ArcadeRacingView(self.app, self.session, race_config=config))
 
     def on_resize(self, width: int, height: int):
         super().on_resize(width, height)

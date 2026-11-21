@@ -41,7 +41,7 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 - Replaced the Arcade race, lab, and dashboard bridge destinations with real views backed by `RaceEngine`, the shared algorithm modules, `GameSession`, and scoring services.
 - Racing now has fixed-step updates, legal graph-edge movement, player speed/brake/fork/refuel/nitro/sprint decisions, camera modes, minimap, closures, live event feed, race results, and session persistence.
 - Algorithm Lab exposes all 12 required algorithm families with real execution, traces or result summaries, step/run/reset/compare/export controls, complexity, and gameplay usage labels.
-- Championship Dashboard loads persistent standings, runs deterministic three-circuit previews when needed, supports Merge/Quick/Heap ranking, Top-3/Top-4 views, next-race continuation, podium, and shared scoring data.
+- Championship Dashboard loads persistent standings without hidden preview races, supports Merge/Quick/Heap ranking, Top-3/Top-4 views, next-round continuation, podium, reset confirmation, and shared scoring data.
 - Added CI workflow, release-oriented `.gitignore`, verification matrix, sprint/race handoff regression, 12-family catalog regression, and duplicate-safe championship persistence regression.
 - Rechecked actual Arcade captures after fixing header navigation collisions and dashboard footer overlap. Latest captures: `arcade_race_1280.png`, `arcade_lab_1280.png`, and `arcade_dashboard_1280.png`.
 - Phase checkpoint verification: 39 tests passed; Ruff and compile checks passed; all three circuits validated; championship replay, five experiments, and technical report regenerated successfully. The later Algorithm Lab overhaul raised the current suite to 47 tests.
@@ -63,6 +63,15 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 - Added shared circuit/source/target/cost/event-revision/budget controls, validation for missing/same/incompatible selections, isolated graph snapshots, actual per-side traces, synchronized playback, independent trace lengths, step explanations, pseudocode, metrics, computed conclusions, and JSON export.
 - Visual evidence inspected in `docs/screenshots/algorithm_comparison_weighted_1280.png`; the equal-weight side-by-side workspace is readable at the 1280×720 target and retains the dark racing telemetry theme.
 - Comparison audit: all four categories executed, reverse sorting order produced the same ranking, invalid pairs were rejected, stale results were cleared, and playback/reset/export paths were exercised.
+
+## Quick Race and Championship modes (2026-11-21)
+
+- Added a standalone Quick Race setup with circuit switching, 1/2/3/5 lap selection, Easy/Normal/Hard deterministic AI, road-event toggle, and Balanced/Speed/Economy/Safety routing selection.
+- Quick Race launches `ArcadeRacingView` with the saved setup and a unique race ID, records a dedicated results report with time, fastest lap, fuel used, nitro use, events, and status, and never mutates championship points.
+- Reworked Championship Dashboard into a real persistent season state: not started, in progress, awaiting next round, and completed. It starts/continues/resets a three-round season, launches the next circuit, records each result exactly once, and opens round/final result views.
+- Extended `RaceEngine` with configurable laps, event enable/disable, AI difficulty multipliers, race metadata, and resource telemetry while preserving the shared graph, checkpoint, event-heap, and scoring implementations.
+- Added responsive Arcade smoke captures for Quick Race setup and Championship Dashboard at 1280x720 and 1600x900, inspected after fixing header and control-panel overlap. Quick Results also has a verified empty-state report for a fresh session.
+- Verification after this phase: 50 tests passed, Ruff passed, compile checks passed, `run_validation.py` passed for all three circuits, three one-lap Quick Race engine smokes completed without DNF, and a three-round championship session completed with points and tie-break data persisted.
 
 ## Next actions
 

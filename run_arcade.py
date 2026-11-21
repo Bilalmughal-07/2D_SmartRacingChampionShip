@@ -17,7 +17,11 @@ def main() -> None:
     parser.add_argument("--width", type=int, default=None)
     parser.add_argument("--height", type=int, default=None)
     parser.add_argument("--modal", choices=("instructions", "settings", "exit"), default=None)
-    parser.add_argument("--screen", choices=("menu", "circuits", "explorer", "lab", "race", "dashboard"), default="menu")
+    parser.add_argument(
+        "--screen",
+        choices=("menu", "circuits", "explorer", "lab", "race", "dashboard", "quick_setup", "quick_results", "championship_results"),
+        default="menu",
+    )
     args = parser.parse_args()
     size = (args.width, args.height) if args.width and args.height else None
     ArcadeApp(
