@@ -26,8 +26,9 @@ This ledger records evidence-backed work for the Smart Racing Championship final
 - Functional audits: `python run_validation.py` → 3/3 valid; full deterministic championship → 3 races, 4 racers each, no DNF; experiments and report regenerated.
 - Visual evidence: latest inspected `docs/screenshots/arcade_race_1280.png`, `arcade_lab_1280.png`, `arcade_dashboard_1280.png`; title/nav collisions and footer overlap fixed and recaptured.
 - Release status: executable and ZIP rebuild remains the final local action. Placeholder registration metadata remains an external submission input.
-- GitHub blocker unchanged: no local commits, no configured remote, and `gh` is not installed; therefore no branch push/PR/merge is claimed.
+- GitHub delivery: resolved. GitHub CLI 2.105.0 is installed and authenticated as `Bilalmughal-07`; origin is configured to `https://github.com/Bilalmughal-07/2D_SmartRacingChampionShip.git`.
+- Pull requests: [#1 core](https://github.com/Bilalmughal-07/2D_SmartRacingChampionShip/pull/1), [#2 Arcade](https://github.com/Bilalmughal-07/2D_SmartRacingChampionShip/pull/2), and [#3 QA/release](https://github.com/Bilalmughal-07/2D_SmartRacingChampionShip/pull/3) are open and clean. PR #3 CI passed on Python 3.12. No merge is claimed; review/merge remains a repository workflow decision.
 - Final release audit: `submission/24I-XXXX_24I-YYYY_24I-ZZZZ_Section.zip`, 609 entries, 77.22 MB, report/core executable/Arcade executable/manifest present, zero cache artifacts.
 - Final archive SHA-256: `9B793B5C75747F77E01C705D577FFD6C3293AA4115F7503751E3C712F9820CEC`.
 - Clean extraction smoke: packaged core executable completed `circuit_03`; packaged Arcade executable rendered the corrected Dashboard smoke frame. PyInstaller emitted only the known Arcade `wintab32.dll` optional-library warning and the packaged Arcade VERSION permission warning; both processes exited successfully.
-- Next action: replace placeholder registration metadata, then configure authorized GitHub remote/CLI if PR delivery is required.
+- Next action: replace placeholder registration metadata; review and merge the stacked PRs in order if desired.

@@ -50,7 +50,7 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 
 1. Rebuild the final ZIP after replacing the placeholder registration numbers and section.
 2. Fill actual group member names and registration numbers on the report title page.
-3. If GitHub delivery is required, configure the intended remote and install/authenticate `gh`; the current workspace has no remote, no commits, and no GitHub CLI.
+3. Review and merge the stacked GitHub PRs in order if desired: core, Arcade, then QA/release.
 
 ## External inputs still required
 
