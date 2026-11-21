@@ -54,3 +54,11 @@ This ledger records evidence-backed work for the Smart Racing Championship final
 - Added a no-op guard so applying the already-active status does not create false event history or invalidate a route.
 - Visual verification: inspected `docs/screenshots/arcade_explorer_events_1280.png` after the modal update.
 - Regression: `python -m pytest -q` → 42 passed; `python -m ruff check .` → passed.
+
+## 2026-11-21 — Road Event Preview split-screen workspace
+
+- Replaced the blocking event modal with a persistent two-pane workspace: the authoritative circuit map remains visible and clickable on the left while event controls and route impact remain in the right planning panel.
+- Added accurate edge hit-testing with hover highlighting, selected-edge metadata, overlapping-edge cycling, visible open/restricted/blocked states, restriction penalties, recalculate, undo, reset, and canonical close/restore behavior.
+- Added regression coverage for restriction cost changes, undo restoration, and restoration of the canonical graph/route when the preview closes.
+- Visual verification: regenerated and inspected `docs/screenshots/arcade_explorer_events_1280.png`, `arcade_explorer_events_1440.png`, and `arcade_explorer_events_1600.png`; corrected compact-panel text/button spacing at 1280×720 and wider layouts.
+- Regression: `python -m pytest -q` → 46 passed; `python -m ruff check .` → passed.

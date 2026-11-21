@@ -18,7 +18,7 @@ This audit covers the functional-overhaul branch. Each control is wired to a rea
 | COMPARE ROUTES | Computes all four weighted candidates from the same graph/objective | Preserves identical paths as separate objective candidates and shows unavailable candidates as invalid | comparison modal screenshots |
 | PLAN RESOURCES | Runs fuel feasibility plus Nitro DP/Greedy planning | Does not silently alter race rules | resource modal screenshot |
 | ROUTE STATUS | Explains current route state | Distinguishes no route, stale, invalid, feasible, infeasible | `show_route_status()` |
-| ROAD EVENT PREVIEW | Opens road selection and event actions | Events apply to Explorer graph copy only | event modal screenshot |
+| ROAD EVENT PREVIEW | Opens a persistent split-screen map/control workspace | Events apply to the Explorer graph copy only; the map remains clickable while controls stay in the right panel | split-screen event screenshots |
 | CLOSE / REOPEN / RESTRICT ROAD | Mutates the selected edge status | No-op status changes are ignored; real mutations invalidate the prior route | `apply_event()` and blocked-edge/no-op tests |
 | UNDO LAST / RESET EVENTS | Restores prior or canonical edge statuses | Rebuilds route validity state | event history methods |
 | RECALCULATE | Replans after a road event | Uses the modified graph revision | `recalculate_from_event_modal()` |
@@ -30,4 +30,5 @@ This audit covers the functional-overhaul branch. Each control is wired to a rea
 ## Visual evidence
 
 - Base states: `docs/screenshots/arcade_explorer_overhaul_1280.png`, `arcade_explorer_overhaul_1600.png`, `arcade_explorer_overhaul_1920.png`.
-- Modal states: `arcade_explorer_compare_1280.png`, `arcade_explorer_compare_1600.png`, `arcade_explorer_compare_1920.png`, `arcade_explorer_resources_1280.png`, `arcade_explorer_events_1280.png`, and `arcade_explorer_start_confirm_1280.png`.
+- Modal states: `arcade_explorer_compare_1280.png`, `arcade_explorer_compare_1600.png`, `arcade_explorer_compare_1920.png`, `arcade_explorer_resources_1280.png`, and `arcade_explorer_start_confirm_1280.png`.
+- Split-screen event states: `arcade_explorer_events_1280.png`, `arcade_explorer_events_1440.png`, and `arcade_explorer_events_1600.png`.

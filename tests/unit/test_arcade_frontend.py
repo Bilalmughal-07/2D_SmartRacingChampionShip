@@ -186,6 +186,72 @@ def test_explorer_road_event_preview_does_not_record_noop_status_change():
     assert view.graph_revision == 1
 
 
+def test_explorer_road_event_restriction_changes_cost_and_undo_restores():
+    track = load_tracks()[0]
+    view = object.__new__(TrackExplorerView)
+    view.graph = deepcopy(track.graph())
+    view.event_edge_id = 0
+    view.event_history = []
+    view.graph_revision = 1
+    view.status_message = ""
+    view.status_color = None
+    view._mark_route_stale = lambda _message: None
+    view.rebuild_ui = lambda: None
+
+    edge = view.graph.edges[0]
+    original_time = edge.effective_time()
+    original_difficulty = edge.effective_difficulty()
+    view.apply_event(EdgeStatus.RESTRICTED)
+
+    assert edge.status == EdgeStatus.RESTRICTED
+    assert edge.effective_time() > original_time
+    assert edge.effective_difficulty() > original_difficulty
+    assert view.event_history == [(0, EdgeStatus.OPEN, None)]
+
+    view.undo_event()
+
+    assert edge.status == EdgeStatus.OPEN
+    assert "explorer_restriction" not in edge.effects
+    assert edge.effective_time() == original_time
+    assert edge.effective_difficulty() == original_difficulty
+    assert view.event_history == []
+
+
+def test_explorer_close_event_preview_restores_canonical_graph_and_route():
+    track = load_tracks()[0]
+    original_graph = deepcopy(track.graph())
+    view = object.__new__(TrackExplorerView)
+    view.graph = deepcopy(original_graph)
+    view.graph.edges[0].status = EdgeStatus.BLOCKED
+    view.event_original_graph = original_graph
+    expected_route = {"path": [track.start_id, track.finish_id]}
+    view.event_original_route = expected_route
+    view.event_original_route_state = "ROUTE_READY"
+    view.event_original_resource_accepted = True
+    view.event_history = [(0, EdgeStatus.OPEN, None)]
+    view.event_edge_id = 0
+    view.event_candidate_ids = [0]
+    view.event_candidate_index = 0
+    view.graph_revision = 3
+    view.route_result = {"path": [track.start_id]}
+    view.event_after_route = {"path": [track.finish_id]}
+    view.resource_accepted = False
+    view.route_revision = 2
+    view.route_state = "ROUTE_STALE"
+    view.modal = "events"
+    view.status_message = ""
+    view.status_color = None
+    view.rebuild_ui = lambda: None
+
+    view.close_event_preview()
+
+    assert view.modal is None
+    assert view.graph.edges[0].status == original_graph.edges[0].status
+    assert view.route_result == expected_route
+    assert view.resource_accepted is True
+    assert view.event_history == []
+
+
 def test_arcade_phase_views_expose_all_required_algorithm_families():
     assert len(CATALOG) == 12
     assert [name for name, *_ in CATALOG] == [

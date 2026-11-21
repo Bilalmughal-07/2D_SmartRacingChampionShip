@@ -65,8 +65,11 @@ if (-not (Test-Path -LiteralPath $zipPath)) { throw "ZIP was not created" }
 $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $zipPath))
 try {
     $required = @("README.md", "run_game.py", "run_arcade.py", "src/smart_racing", "report/Smart_Racing_Technical_Report.pdf", "Executable/SmartRacingChampionship.exe", "Executable/Arcade/SmartRacingChampionshipArcade.exe", "MANIFEST.json")
+    # System.IO.ZipArchive exposes Windows paths with backslashes, while the
+    # required list intentionally uses portable slash-separated paths.
+    $archiveNames = $archive.Entries.FullName | ForEach-Object { $_ -replace "\\", "/" }
     foreach ($name in $required) {
-        if (-not ($archive.Entries.FullName | Where-Object { $_ -eq $name -or $_ -like "$name/*" })) { throw "ZIP missing $name" }
+        if (-not ($archiveNames | Where-Object { $_ -eq $name -or $_ -like "$name/*" })) { throw "ZIP missing $name" }
     }
 } finally { $archive.Dispose() }
 Write-Host "Submission archive created: $zipPath"

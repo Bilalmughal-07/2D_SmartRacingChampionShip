@@ -180,6 +180,8 @@ class ArcadeView(arcade.View):
             self.go_menu()
 
     def go_menu(self) -> None:
+        if self.modal == "events":
+            self.close_event_preview()
         target = self.session.explorer_return
         if target == "circuit_selection":
             self.app.show_view(CircuitSelectionView(self.app, self.session))
@@ -665,9 +667,16 @@ class TrackExplorerView(ArcadeView):
         self.resource_accepted = False
         self.modal: str | None = None
         self.event_edge_id: int | None = None
-        self.event_history: list[tuple[int, EdgeStatus]] = []
+        self.event_history: list[tuple[int, EdgeStatus, dict | None]] = []
         self.event_base_status: dict[int, EdgeStatus] = {}
         self.event_type = "close"
+        self.event_candidate_ids: list[int] = []
+        self.event_candidate_index = 0
+        self.event_original_graph = None
+        self.event_original_route: dict | None = None
+        self.event_after_route: dict | None = None
+        self.event_original_route_state = "NO_ROUTE"
+        self.event_original_resource_accepted = False
         self.inspected_edge_id: int | None = None
         self.inspection_active = False
         self.route_state = "NO_ROUTE"
@@ -752,6 +761,15 @@ class TrackExplorerView(ArcadeView):
         self.add_button("ALGORITHM LAB", 350, nav_y, 160, 38, self.open_lab, NAVY, WHITE, CYAN)
 
         left, bottom, width, height = self.side_rect
+        if self.modal == "events":
+            # Road events are a persistent workspace, not a blocking modal:
+            # the map remains visible and receives road-selection clicks while
+            # these controls live in the right planning panel.
+            self.base_button_count = len(self.buttons)
+            self.rebuild_event_workspace_ui(left, bottom, width, height)
+            self.focus_index = self.base_button_count
+            return
+
         mode_y = bottom + height - 96
         mode_width = (width - 30) / 2
         self.add_button("FREE EXPLORATION", left + 12, mode_y, mode_width, 34, lambda: self.set_explorer_mode("free"), CYAN if self.explorer_mode == "free" else NAVY, NAVY if self.explorer_mode == "free" else WHITE, CYAN)
@@ -846,6 +864,36 @@ class TrackExplorerView(ArcadeView):
         if self.modal and len(self.buttons) > self.base_button_count:
             self.focus_index = self.base_button_count
 
+    def rebuild_event_workspace_ui(self, left: float, bottom: float, width: float, height: float) -> None:
+        """Place event controls in the right panel while keeping the map live."""
+        compact_width = (width - 30) / 2
+        edge = self.graph.edges.get(self.event_edge_id)
+        selected = edge is not None
+        close_enabled = selected and edge.status != EdgeStatus.BLOCKED
+        reopen_enabled = selected and edge.status != EdgeStatus.OPEN
+        restrict_enabled = selected and edge.status != EdgeStatus.RESTRICTED
+        row_one = bottom + 190
+        row_two = row_one - 42
+        row_three = row_two - 42
+
+        def button_colors(enabled: bool, fill: tuple[int, int, int], text: tuple[int, int, int], border: tuple[int, int, int]):
+            return (fill, text, border) if enabled else (PANEL_DARK, MUTED, (83, 112, 139))
+
+        fill, text, border = button_colors(close_enabled, CORAL, WHITE, CORAL)
+        self.add_button("CLOSE ROAD", left + 12, row_one, compact_width, 32, lambda: self.apply_event(EdgeStatus.BLOCKED), fill, text, border)
+        fill, text, border = button_colors(reopen_enabled, EMERALD, NAVY, EMERALD)
+        self.add_button("REOPEN ROAD", left + 18 + compact_width, row_one, compact_width, 32, lambda: self.apply_event(EdgeStatus.OPEN), fill, text, border)
+        fill, text, border = button_colors(restrict_enabled, AMBER, NAVY, AMBER)
+        self.add_button("RESTRICT ROAD", left + 12, row_two, compact_width, 32, lambda: self.apply_event(EdgeStatus.RESTRICTED), fill, text, border)
+        next_enabled = len(self.event_candidate_ids) > 1
+        fill, text, border = button_colors(next_enabled, NAVY, WHITE, CYAN)
+        self.add_button("NEXT ROAD", left + 18 + compact_width, row_two, compact_width, 32, self.cycle_event_edge, fill, text, border)
+        self.add_button("UNDO LAST", left + 12, row_three, compact_width, 32, self.undo_event, NAVY, WHITE, CYAN)
+        self.add_button("RESET EVENTS", left + 18 + compact_width, row_three, compact_width, 32, self.reset_events, NAVY, WHITE, CORAL)
+        footer_y = bottom - 24
+        self.add_button("RECALCULATE", left + 12, footer_y + 38, compact_width, 34, self.recalculate_from_event_modal, CYAN, NAVY, CYAN)
+        self.add_button("CLOSE PREVIEW", left + 18 + compact_width, footer_y + 38, compact_width, 34, self.close_modal, NAVY, WHITE, CYAN)
+
     def on_resize(self, width: int, height: int):
         super().on_resize(width, height)
         self.rebuild_ui()
@@ -920,13 +968,53 @@ class TrackExplorerView(ArcadeView):
         self.rebuild_ui()
 
     def open_event_modal(self) -> None:
+        if self.modal != "events":
+            self.event_original_graph = deepcopy(self.graph)
+            self.event_original_route = deepcopy(self.route_result)
+            self.event_original_route_state = self.route_state
+            self.event_original_resource_accepted = self.resource_accepted
+            self.event_after_route = None
+            self.event_candidate_ids = []
+            self.event_candidate_index = 0
         self.modal = "events"
-        self.event_edge_id = self.event_edge_id or (self.route_result or {}).get("metrics", {}).get("edge_ids", [None])[0]
-        self.status_message = "Road Event Preview: click a road, then apply Close, Reopen, or Restrict."
+        if self.event_edge_id is None:
+            self.event_edge_id = (self.route_result or {}).get("metrics", {}).get("edge_ids", [None])[0]
+        if self.event_edge_id in self.graph.edges and not self.event_candidate_ids:
+            self.event_candidate_ids = [self.event_edge_id]
+        self.status_message = "Road Event Preview: hover over a road, then click it to select."
         self.status_color = AMBER
         self.rebuild_ui()
 
     def close_modal(self) -> None:
+        if self.modal == "events":
+            self.close_event_preview()
+            return
+        self.modal = None
+        self.rebuild_ui()
+
+    def close_event_preview(self) -> None:
+        """Leave the preview without carrying temporary events into racing."""
+        if self.event_original_graph is not None:
+            self.graph = deepcopy(self.event_original_graph)
+        self.event_history = []
+        self.event_base_status = {edge_id: edge.status for edge_id, edge in self.graph.edges.items()}
+        self.event_edge_id = None
+        self.event_candidate_ids = []
+        self.event_candidate_index = 0
+        self.graph_revision += 1
+        self.route_result = deepcopy(self.event_original_route)
+        self.event_after_route = None
+        self.resource_accepted = self.event_original_resource_accepted
+        if self.route_result:
+            self.route_revision = self.graph_revision
+            self.route_state = self.event_original_route_state
+        else:
+            self.route_revision = -1
+            self.route_state = "NO_ROUTE"
+        self.status_message = "Road Event Preview closed; the original planning graph and route were restored."
+        self.status_color = CYAN
+        self.event_original_graph = None
+        self.event_original_route = None
         self.modal = None
         self.rebuild_ui()
 
@@ -1177,12 +1265,17 @@ class TrackExplorerView(ArcadeView):
             self.status_color = CORAL
             return
         edge = self.graph.edges[self.event_edge_id]
-        if edge.status == status:
+        if edge.status == status and (status != EdgeStatus.RESTRICTED or "explorer_restriction" in edge.effects):
             self.status_message = f"Road {edge.id} is already {status.value}; no preview change was recorded."
             self.status_color = MUTED
             return
-        self.event_history.append((edge.id, edge.status))
+        old_effect = deepcopy(edge.effects.get("explorer_restriction"))
+        self.event_history.append((edge.id, edge.status, old_effect))
         edge.status = status
+        if status == EdgeStatus.RESTRICTED:
+            self.graph.add_effect(edge.id, "explorer_restriction", {"time_multiplier": 1.35, "difficulty_penalty": 1.0})
+        else:
+            self.graph.remove_effect(edge.id, "explorer_restriction")
         self.graph_revision += 1
         self._mark_route_stale(f"Preview event applied to road {edge.id}: {status.value}. Recalculate to update the route.")
         self.status_color = CORAL if status == EdgeStatus.BLOCKED else AMBER
@@ -1193,23 +1286,45 @@ class TrackExplorerView(ArcadeView):
             self.status_message = "No preview road event is available to undo."
             self.status_color = MUTED
             return
-        edge_id, old_status = self.event_history.pop()
-        self.graph.edges[edge_id].status = old_status
+        edge_id, old_status, old_effect = self.event_history.pop()
+        edge = self.graph.edges[edge_id]
+        edge.status = old_status
+        if old_effect is None:
+            self.graph.remove_effect(edge_id, "explorer_restriction")
+        else:
+            self.graph.add_effect(edge_id, "explorer_restriction", old_effect)
         self.graph_revision += 1
         self._mark_route_stale(f"Undid the preview event on road {edge_id}; recalculate when ready.")
         self.rebuild_ui()
 
     def reset_events(self) -> None:
-        for edge_id, status in self.event_base_status.items():
-            self.graph.edges[edge_id].status = status
+        if self.event_original_graph is not None:
+            self.graph = deepcopy(self.event_original_graph)
+            self.event_base_status = {edge_id: edge.status for edge_id, edge in self.graph.edges.items()}
+        else:
+            for edge_id, status in self.event_base_status.items():
+                self.graph.edges[edge_id].status = status
         self.event_history = []
         self.graph_revision += 1
-        self._mark_route_stale("All temporary road events were reset; the canonical circuit was not changed.")
-        self.rebuild_ui()
+        self.status_message = "All temporary road events were reset; recalculating the original preview route."
+        self.status_color = CYAN
+        self.calculate_route()
+        self.event_after_route = deepcopy(self.route_result)
 
     def recalculate_from_event_modal(self) -> None:
-        self.modal = None
         self.calculate_route()
+        self.event_after_route = deepcopy(self.route_result)
+
+    def cycle_event_edge(self) -> None:
+        if len(self.event_candidate_ids) < 2:
+            self.status_message = "No overlapping road candidates need disambiguation."
+            self.status_color = MUTED
+            return
+        self.event_candidate_index = (self.event_candidate_index + 1) % len(self.event_candidate_ids)
+        self.event_edge_id = self.event_candidate_ids[self.event_candidate_index]
+        self.status_message = f"Selected road {self.event_edge_id}; use the event controls or cycle again."
+        self.status_color = CYAN
+        self.rebuild_ui()
 
     def on_key_press(self, symbol: int, modifiers: int):
         if self.modal:
@@ -1232,6 +1347,11 @@ class TrackExplorerView(ArcadeView):
     def on_mouse_motion(self, x: float, y: float, dx: float, dy: float):
         super().on_mouse_motion(x, y, dx, dy)
         self._last_mouse_position = (x, y)
+        if self.modal == "events" and self.map_contains(x, y):
+            candidates = self.edge_candidates(x, y)
+            self.hover_vertex_id = None
+            self.hover_edge_id = candidates[0] if candidates else None
+            return
         if self.drag_anchor is None:
             self.hover_vertex_id = self.nearest_vertex(x, y)
             self.hover_edge_id = None if self.hover_vertex_id is not None else self.nearest_edge(x, y)
@@ -1241,10 +1361,13 @@ class TrackExplorerView(ArcadeView):
             return
         if self.map_contains(x, y):
             if self.modal == "events":
-                edge_id = self.nearest_edge(x, y)
-                if edge_id is not None:
-                    self.event_edge_id = edge_id
-                    self.status_message = f"Road {edge_id} selected for preview event."
+                candidates = self.edge_candidates(x, y)
+                if candidates:
+                    self.event_candidate_ids = candidates
+                    self.event_candidate_index = 0
+                    self.event_edge_id = candidates[0]
+                    suffix = f" Nearby roads: {', '.join(f'E{edge_id}' for edge_id in candidates[1:])}. Use NEXT ROAD to disambiguate." if len(candidates) > 1 else ""
+                    self.status_message = f"Road {self.event_edge_id} selected for preview event.{suffix}"
                     self.status_color = CYAN
                     self.rebuild_ui()
                 return
@@ -1330,9 +1453,14 @@ class TrackExplorerView(ArcadeView):
         return min(candidates)[1] if candidates else None
 
     def nearest_edge(self, x: float, y: float) -> int | None:
+        candidates = self.edge_candidates(x, y)
+        return candidates[0] if candidates else None
+
+    def edge_candidates(self, x: float, y: float, tolerance: float = 14.0) -> list[int]:
+        """Return graph edges whose rendered segments are under the cursor."""
         if not self.map_contains(x, y):
-            return None
-        best = (12.0, None)
+            return []
+        candidates: list[tuple[float, int]] = []
         for edge in self.graph.edges.values():
             source = self.graph.vertices[edge.from_id]
             target = self.graph.vertices[edge.to_id]
@@ -1343,9 +1471,9 @@ class TrackExplorerView(ArcadeView):
             t = _clamp(((x - ax) * dx + (y - ay) * dy) / length_sq, 0, 1)
             px, py = ax + t * dx, ay + t * dy
             distance = ((px - x) ** 2 + (py - y) ** 2) ** 0.5
-            if distance < best[0]:
-                best = (distance, edge.id)
-        return best[1]
+            if distance <= tolerance:
+                candidates.append((distance, edge.id))
+        return [edge_id for _distance, edge_id in sorted(candidates, key=lambda item: (item[0], item[1]))]
 
     def graph_summary(self) -> tuple[int, int, int, int]:
         reachable = set()
@@ -1399,8 +1527,8 @@ class TrackExplorerView(ArcadeView):
             # Modal controls are kept in the same UI manager for input
             # handling, but the underlying planner controls must not paint
             # through the modal overlay.
-            button.visible = not self.modal or index >= self.base_button_count
-        if self.modal:
+            button.visible = True if self.modal == "events" else (not self.modal or index >= self.base_button_count)
+        if self.modal and self.modal != "events":
             self.draw_explorer_modal()
         self.ui.draw()
         self.draw_focus()
@@ -1434,7 +1562,11 @@ class TrackExplorerView(ArcadeView):
                 mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
                 arcade.draw_line(mx - 9, my - 9, mx + 9, my + 9, CORAL, 3)
                 arcade.draw_line(mx - 9, my + 9, mx + 9, my - 9, CORAL, 3)
-        for edge_id, color in ((self.inspected_edge_id, AMBER), (self.event_edge_id if self.modal == "events" else None, CORAL)):
+        for edge_id, color in (
+            (self.inspected_edge_id, AMBER),
+            (self.hover_edge_id if self.modal == "events" else None, CYAN),
+            (self.event_edge_id if self.modal == "events" else None, CORAL),
+        ):
             if edge_id in self.graph.edges:
                 edge = self.graph.edges[edge_id]
                 source, target = self.graph.vertices[edge.from_id], self.graph.vertices[edge.to_id]
@@ -1675,7 +1807,62 @@ class TrackExplorerView(ArcadeView):
             label = str(vertex.id)
         _text(label, px, py + radius + 4, 10 if len(label) < 4 else 8, WHITE, anchor_x="center", anchor_y="bottom", bold=True)
 
+    def draw_event_side_panel(self) -> None:
+        """Render the non-blocking road-event workspace in the right panel."""
+        left, bottom, width, height = self.side_rect
+        self.draw_panel(left, bottom, width, height, 245)
+        _text("ROAD EVENT PREVIEW", left + 14, bottom + height - 28, 16, WHITE, bold=True)
+        _text("Hover over a road, then click it to select", left + 14, bottom + height - 49, 10, MUTED, width=width - 28)
+
+        selected = self.event_edge_id in self.graph.edges
+        if selected:
+            edge = self.graph.edges[self.event_edge_id]
+            status_color = {
+                EdgeStatus.OPEN: EMERALD,
+                EdgeStatus.RESTRICTED: AMBER,
+                EdgeStatus.BLOCKED: CORAL,
+            }.get(edge.status, MUTED)
+            on_route = bool(self.route_result and edge.id in self.route_result.get("metrics", {}).get("edge_ids", []))
+            _text("SELECTED ROAD", left + 14, bottom + height - 86, 10, CYAN, bold=True)
+            _text(f"E{edge.id}: V{edge.from_id} → V{edge.to_id}", left + 14, bottom + height - 110, 14, WHITE, bold=True)
+            _text(f"{'ONE-WAY' if edge.directed else 'TWO-WAY'}  {edge.distance:.1f}m  {edge.effective_time():.1f}s", left + 14, bottom + height - 134, 11, MUTED)
+            _text(f"Fuel {edge.effective_fuel():.1f}  Difficulty {edge.effective_difficulty()}", left + 14, bottom + height - 155, 11, MUTED)
+            _text(f"STATUS: {edge.status.value.upper()}", left + 14, bottom + height - 181, 11, status_color, bold=True)
+            _text(f"Shortcut: {'YES' if edge.is_shortcut else 'NO'}  Active route: {'YES' if on_route else 'NO'}", left + 14, bottom + height - 202, 10, MUTED, width=width - 28)
+            if len(self.event_candidate_ids) > 1:
+                _text("Overlapping roads: " + ", ".join(f"E{edge_id}" for edge_id in self.event_candidate_ids), left + 14, bottom + height - 223, 10, AMBER, width=width - 28)
+        else:
+            _text("NO ROAD SELECTED", left + 14, bottom + height - 90, 13, AMBER, bold=True)
+            _text("Click a road segment on the map to preview a temporary event.", left + 14, bottom + height - 116, 10, MUTED, width=width - 28)
+
+        panel_top = bottom + height
+        preview_y = panel_top - 238
+        _text("PREVIEW STATE", left + 14, preview_y, 10, CYAN, bold=True)
+        _text(f"Temporary changes: {len(self.event_history)}  •  Graph revision: {self.graph_revision}", left + 14, preview_y - 19, 10, MUTED, width=width - 28)
+        _text(f"Route: {self.route_state.replace('_', ' ')}  •  {self.algorithm} / {self.preset.title() if self.algorithm in {'Dijkstra', 'A*'} else 'N/A'}", left + 14, preview_y - 37, 10, self.status_color, width=width - 28)
+
+        before = self.event_original_route
+        after = self.event_after_route
+        if after is None and self.route_state not in {"ROUTE_STALE", "ROUTE_INVALID", "PLAN_INFEASIBLE"}:
+            after = self.route_result
+        controls_base = bottom + (200 if height < 650 else 190)
+        impact_y = controls_base + 85
+        _text("ROUTE IMPACT", left + 14, impact_y, 10, CYAN, bold=True)
+        if before:
+            before_metrics = before.get("metrics", {})
+            after_metrics = (after or {}).get("metrics", {})
+            _text(f"Before: {before_metrics.get('distance', 0):.1f}m  {before_metrics.get('travel_time', 0):.1f}s  fuel {before_metrics.get('fuel', 0):.1f}", left + 14, impact_y - 16, 9, MUTED, width=width - 28)
+            _text(f"After:  {after_metrics.get('distance', 0):.1f}m  {after_metrics.get('travel_time', 0):.1f}s  fuel {after_metrics.get('fuel', 0):.1f}" if after else "After: recalculate required", left + 14, impact_y - 32, 9, WHITE if after else AMBER, width=width - 28)
+            changed = after is not None and tuple(before.get("path", [])) != tuple(after.get("path", []))
+            _text(f"Cost {after_metrics.get('weighted_cost', 0):.3f}  •  Fuel {'YES' if after and after.get('resources', {}).get('fuel_feasible') else '—'}  •  Changed {'YES' if changed else ('NO' if after else 'PENDING')}", left + 14, impact_y - 48, 9, EMERALD if changed else (MUTED if after else AMBER), width=width - 28)
+        else:
+            _text("Before: no route snapshot", left + 14, impact_y - 16, 9, MUTED)
+            _text("After: calculate a route to compare impact", left + 14, impact_y - 32, 9, AMBER, width=width - 28)
+
     def draw_side_panel(self) -> None:
+        if self.modal == "events":
+            self.draw_event_side_panel()
+            return
         left, bottom, width, height = self.side_rect
         self.draw_panel(left, bottom, width, height, 245)
         _text("ROUTE PLANNER", left + 14, bottom + height - 28, 17, WHITE, bold=True)
