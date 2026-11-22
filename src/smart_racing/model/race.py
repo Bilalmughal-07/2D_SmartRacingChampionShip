@@ -42,6 +42,7 @@ class Racer:
     sprint_remaining: float = 0.0
     sprint_cooldown: float = 0.0
     selected_exit: int | None = None
+    selected_exit_vertex: int | None = None
     exit_confirmed: bool = False
     fuel_used: float = 0.0
     nitro_uses: int = 0

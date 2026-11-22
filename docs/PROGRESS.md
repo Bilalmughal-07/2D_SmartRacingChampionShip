@@ -108,6 +108,12 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 - Verified actual 1280×720 Arcade settings, dashboard, Explorer, and Racing frames after the layout fix. The settings labels and volume rows no longer overlap the controls.
 - Verification after this phase: 62 tests passed, Ruff passed, compile checks passed, all three circuits completed with four finishers with and without seeded events, `run_validation.py` passed, and free-route one-lap launch plus blocked-route recovery were covered by regression tests.
 
+## Buffered intersection controls (2026-11-22)
+
+- Fixed player A/D route selection so input made while approaching a junction targets the upcoming vertex instead of the previous vertex.
+- Confirmed choices are now buffered through edge arrival, remain visible in the HUD, and are consumed only when the car reaches the selected junction. The selected road then becomes the first edge of the live route and triggers the blue/white reroute presentation when it differs from the plan.
+- Added an all-circuit regression test for selection persistence and confirmed-road execution. Verification now totals 63 passing tests with Ruff still clean.
+
 ## External inputs still required
 
 - Actual registration numbers, section, and group names.

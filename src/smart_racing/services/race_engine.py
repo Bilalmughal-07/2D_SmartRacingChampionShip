@@ -361,7 +361,7 @@ class RaceEngine:
 
     def _plan_player_exit(self, racer: Racer) -> dict | None:
         selected = racer.selected_exit
-        if selected is None:
+        if selected is None or racer.selected_exit_vertex != racer.current_vertex:
             return None
         edge = self.graph.edge_between(racer.current_vertex, selected)
         if edge is None or not edge.traversable():
@@ -396,14 +396,21 @@ class RaceEngine:
         length = max(1.0, math.hypot(dx, dy))
         return dx / length, dy / length
 
-    def _ordered_player_exits(self, racer: Racer) -> list[int]:
+    def _decision_vertex(self, racer: Racer) -> int:
+        """Return the junction where the player's next decision is made."""
+        if racer.current_path and racer.edge_progress > 0 and racer.current_edge_index + 1 < len(racer.current_path):
+            return racer.current_path[racer.current_edge_index + 1]
+        return racer.current_vertex
+
+    def _ordered_player_exits(self, racer: Racer, vertex_id: int | None = None) -> list[int]:
+        vertex_id = racer.current_vertex if vertex_id is None else vertex_id
         hx, hy = self._player_heading(racer)
         options = []
-        for target, edge in self.graph.neighbors(racer.current_vertex):
+        for target, edge in self.graph.neighbors(vertex_id):
             if not edge.traversable():
                 continue
             vertex = self.graph.vertices[target]
-            dx, dy = vertex.x - self.graph.vertices[racer.current_vertex].x, vertex.y - self.graph.vertices[racer.current_vertex].y
+            dx, dy = vertex.x - self.graph.vertices[vertex_id].x, vertex.y - self.graph.vertices[vertex_id].y
             length = max(1.0, math.hypot(dx, dy))
             cross = hx * (dy / length) - hy * (dx / length)
             dot = hx * (dx / length) + hy * (dy / length)
@@ -411,9 +418,17 @@ class RaceEngine:
         return [target for _angle, target in sorted(options, key=lambda item: (item[0], item[1]))]
 
     def _choose_plan(self, racer: Racer):
-        if racer.strategy_type == RacerStrategy.HUMAN and racer.selected_exit is not None and racer.exit_confirmed:
+        if (
+            racer.strategy_type == RacerStrategy.HUMAN
+            and racer.selected_exit is not None
+            and racer.selected_exit_vertex == racer.current_vertex
+            and racer.exit_confirmed
+        ):
             selected_plan = self._plan_player_exit(racer)
             if selected_plan is not None:
+                racer.selected_exit = None
+                racer.selected_exit_vertex = None
+                racer.exit_confirmed = False
                 return selected_plan
         if racer.strategy_type == RacerStrategy.HUMAN and self.player_route:
             planned = self._planned_player_plan(racer)
@@ -591,8 +606,10 @@ class RaceEngine:
             racer.current_edge_index = 0
             racer.current_path = []
             racer.edge_progress = 0.0
-            racer.selected_exit = None
-            racer.exit_confirmed = False
+            if racer.selected_exit_vertex != racer.current_vertex:
+                racer.selected_exit = None
+                racer.selected_exit_vertex = None
+                racer.exit_confirmed = False
             racer.last_edge_from = source_vertex
             racer.last_edge_to = next_vertex
             racer.decision_log.append(f"move_{edge.id}")
@@ -619,18 +636,23 @@ class RaceEngine:
         racer = self._player()
         if racer is None or racer.finished or racer.dnf:
             return []
-        return self._ordered_player_exits(racer)
+        return self._ordered_player_exits(racer, self._decision_vertex(racer))
 
     def cycle_player_exit(self, direction: int) -> int | None:
         """Select a valid outgoing graph neighbor; selection never mutates topology."""
         racer = self._player()
-        options = self.available_player_exits()
+        decision_vertex = self._decision_vertex(racer) if racer is not None else None
+        options = (
+            self._ordered_player_exits(racer, decision_vertex)
+            if racer is not None and decision_vertex is not None
+            else []
+        )
         if racer is None or not options:
             return None
-        if racer.selected_exit not in options:
+        if racer.selected_exit_vertex != decision_vertex or racer.selected_exit not in options:
             heading = self._player_heading(racer)
             signed = []
-            current = self.graph.vertices[racer.current_vertex]
+            current = self.graph.vertices[decision_vertex]
             for target in options:
                 vertex = self.graph.vertices[target]
                 angle = math.atan2(
@@ -649,13 +671,24 @@ class RaceEngine:
         else:
             index = (options.index(racer.selected_exit) + (1 if direction >= 0 else -1)) % len(options)
         racer.selected_exit = options[index]
+        racer.selected_exit_vertex = decision_vertex
         racer.exit_confirmed = False
         racer.decision_log.append(f"select_exit_{racer.selected_exit}")
         return racer.selected_exit
 
     def confirm_player_exit(self) -> bool:
         racer = self._player()
-        if racer is None or racer.selected_exit not in self.available_player_exits():
+        decision_vertex = self._decision_vertex(racer) if racer is not None else None
+        options = (
+            self._ordered_player_exits(racer, decision_vertex)
+            if racer is not None and decision_vertex is not None
+            else []
+        )
+        if (
+            racer is None
+            or racer.selected_exit_vertex != decision_vertex
+            or racer.selected_exit not in options
+        ):
             return False
         racer.exit_confirmed = True
         racer.decision_log.append(f"confirm_exit_{racer.selected_exit}")
@@ -756,6 +789,7 @@ class RaceEngine:
                     "sprint_cooldown": round(r.sprint_cooldown, 2),
                     "waiting": round(r.waiting, 2),
                     "selected_exit": r.selected_exit,
+                    "selected_exit_vertex": r.selected_exit_vertex,
                     "exit_confirmed": r.exit_confirmed,
                 }
                 for r in self.racers

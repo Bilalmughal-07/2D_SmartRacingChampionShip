@@ -139,3 +139,37 @@ def test_free_exploration_plan_can_launch_one_lap_race_to_selected_destination()
     result = next(item for item in engine.run() if item.racer_id == 1)
     assert result.finish_time is not None
     assert not result.dnf
+
+
+def test_player_exit_selection_survives_arrival_at_next_junction_on_all_circuits():
+    for track in load_tracks():
+        planned = RoutePlanner(track).plan_route(
+            track.start_id, track.finish_id, "dijkstra", checkpoint_aware=True
+        )["path"]
+        engine = RaceEngine(
+            track,
+            route_config={"player_path": planned},
+            events_enabled=False,
+        )
+        engine.tick()
+        player = engine._player()
+        decision_vertex = player.current_path[1]
+        planned_next = planned[2]
+        selected = None
+        for _ in range(len(engine.available_player_exits()) + 2):
+            selected = engine.cycle_player_exit(1)
+            if selected != planned_next:
+                break
+        assert selected is not None
+        assert engine.confirm_player_exit()
+        for _ in range(500):
+            engine.tick()
+            if player.current_vertex == decision_vertex:
+                break
+        assert player.current_vertex == decision_vertex
+        assert player.selected_exit == selected
+        assert player.selected_exit_vertex == decision_vertex
+        assert player.exit_confirmed
+        engine.tick()
+        assert player.current_path[:2] == [decision_vertex, selected]
+        assert engine.player_deviated or selected == planned_next

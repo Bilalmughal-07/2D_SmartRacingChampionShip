@@ -29,7 +29,7 @@ Source priority: the supplied `Project.pdf` is authoritative; the implementation
 | Nitro rules | PDF 4.3 | `Racer` nitro fields, engine activation | Racing HUD | resource/control tests | VERIFIED | manual/AI activation and expiry |
 | Reachable service topology | PDF 3.1/4.1/4.3 | generated track graphs + `TrackValidator` resource checks | Explorer/Racing | `test_track_validation.py` + validator | VERIFIED | every fuel/nitro vertex has incident roads, start reachability, finish reachability |
 | Complete-lap/fuel feasibility | PDF 4.2/4.3 | validator ordered-lap and `RoutePlanner.resource_plan` checks; shared start/finish lap reset in `RaceEngine` | Explorer/Racing | `test_track_validation.py`, shared timing-line regression, two-lap planned-route race, full races | VERIFIED | start and finish coordinates coincide on all 3 tracks; start → 10 checkpoints → finish → start → next checkpoint is feasible and completes without DNF |
-| Player driving controls | Improvement prompt 7 | `RaceEngine` input contract + `GameApp` key loop | Racing Screen | player-control integration test | VERIFIED | throttle, brake, route selection, refuel, nitro |
+| Player driving controls | Improvement prompt 7 | `RaceEngine` input contract + buffered junction selection + `GameApp` key loop | Racing Screen | player-control and all-circuit selection-persistence integration tests | VERIFIED | throttle, brake, A/D relative route selection, Enter confirmation, refuel, nitro |
 | Deterministic AI policies | PDF 4.4 | `RaceEngine._choose_plan`, `_fuel_detour_plan`, seeded event scheduler | Racing Screen | all three circuits with and without events; deterministic replay; anti-oscillation regression | VERIFIED | Navigator fixed route/detour, Shortcut legal-shortcut policy, Distance shortest-distance reroute, shared fuel/nitro/checkpoint movement |
 | Event min-heap ordering | PDF 4.5 | `EventScheduler` | event log | event tests | VERIFIED | tuple key |
 | Overlap/cancel/expiry | PDF 4.5 | independent effects/lazy cancellation | event log | event tests | VERIFIED | regression coverage |
@@ -48,7 +48,7 @@ Source priority: the supplied `Project.pdf` is authoritative; the implementation
 | Multi-objective bonus | PDF 8.2 | cost presets | Explorer | preset comparison | VERIFIED | four presets |
 | Live top-k bonus | PDF 8.3 | heap `nsmallest` top-k | Dashboard service | top-k test | VERIFIED | comparator equality |
 | Responsive UI evidence | Improvement prompt 8/19, Phase 1 prompt | `tools/visual_smoke.py`, `docs/screenshots/` | all screens | real Pygame render plus Arcade smoke at 1280x720, 1600x900, 1920x1080 | VERIFIED | Pygame screenshots; latest Arcade menu, settings, instructions, circuit selection, Explorer, Racing, Lab, and Dashboard frames inspected |
-| Required tests | PDF 9.1 | `tests/` | n/a | `python -m pytest -q` | VERIFIED | 62 passed |
+| Required tests | PDF 9.1 | `tests/` | n/a | `python -m pytest -q` | VERIFIED | 63 passed |
 | Technical report | PDF 9.2 | `build_report.py` | n/a | PDF render inspection | VERIFIED | 5-page report |
 | Submission package | PDF 9.3 | `build_submission.ps1` | n/a | archive manifest/open | VERIFIED | ZIP generated |
 | Explorer route configuration handoff | Improvement task | `GameSession.route_plan` → Racing destination | Explorer -> Racing | `test_route_configuration_transfers_from_explorer_to_race_session` + direct view smoke | VERIFIED | circuit, algorithm, preset, endpoints, path, edge IDs, metrics, fuel plan |
