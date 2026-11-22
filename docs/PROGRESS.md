@@ -114,11 +114,11 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 - Confirmed choices are now buffered through edge arrival, remain visible in the HUD, and are consumed only when the car reaches the selected junction. The selected road then becomes the first edge of the live route and triggers the blue/white reroute presentation when it differs from the plan.
 - Added an all-circuit regression test for selection persistence and confirmed-road execution. Verification now totals 63 passing tests with Ruff still clean.
 
-## Race route presentation and no-reverse junction choices (2026-11-22)
+## Race route presentation and junction choice guidance (2026-11-22)
 
-- Excluded the incoming road from the player's A/D exit list, including the first junction where the incoming vertex is inferred from the active edge. Enter can no longer select the road the car is currently travelling away from.
+- Kept the incoming road available as an explicit reverse option. The runtime selector now highlights whichever outgoing edge A/D selected, including the reverse edge, with a bright boundary marker on the large track view so the player can confirm the choice visually.
 - Removed planned and rerouted path strokes from the large race map. Planned blue and recalculated white guidance now render only on the minimap, while the large view remains focused on asphalt, intersections, events, and cars.
-- Inspected the updated 1280×720 Racing smoke frame and verified the large map has no route overlay while the minimap retains the guidance legend.
+- Inspected the updated 1280×720 Racing smoke frame and verified the large map has no route overlay while the minimap retains the guidance legend; the selected-edge boundary is rendered by the same live race surface.
 
 ## External inputs still required
 

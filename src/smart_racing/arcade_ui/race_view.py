@@ -305,6 +305,7 @@ class ArcadeRacingView(ArcadeView):
                 mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
                 arcade.draw_line(mx - 10, my - 10, mx + 10, my + 10, CORAL, 3)
                 arcade.draw_line(mx - 10, my + 10, mx + 10, my - 10, CORAL, 3)
+        self._draw_selected_exit_highlight()
         for vertex in self.engine.graph.vertices.values():
             x, y = self.world_to_screen(vertex.x, vertex.y)
             arcade.draw_circle_filled(x, y, 16, (47, 57, 68))
@@ -315,6 +316,39 @@ class ArcadeRacingView(ArcadeView):
             self._draw_vertex(vertex)
         for racer in self.engine.racers:
             self._draw_car(racer)
+
+    def _draw_selected_exit_highlight(self) -> None:
+        """Show the currently selected junction edge on the main track view."""
+        player = self.engine._player()
+        if player is None or player.selected_exit is None or player.selected_exit_vertex is None:
+            return
+        source = self.engine.graph.vertices.get(player.selected_exit_vertex)
+        target = self.engine.graph.vertices.get(player.selected_exit)
+        if source is None or target is None:
+            return
+        a, b = self.world_to_screen(source.x, source.y), self.world_to_screen(target.x, target.y)
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        length = max(1.0, math.hypot(dx, dy))
+        nx, ny = -dy / length, dx / length
+        offset = 15.0
+        highlight = (255, 214, 72, 235)
+        arcade.draw_line(
+            a[0] + nx * offset,
+            a[1] + ny * offset,
+            b[0] + nx * offset,
+            b[1] + ny * offset,
+            highlight,
+            3,
+        )
+        arcade.draw_line(
+            a[0] - nx * offset,
+            a[1] - ny * offset,
+            b[0] - nx * offset,
+            b[1] - ny * offset,
+            highlight,
+            3,
+        )
+        arcade.draw_circle_filled((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 5, highlight)
 
     @staticmethod
     def _arrow(a, b, color):
