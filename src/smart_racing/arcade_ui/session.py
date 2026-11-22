@@ -16,6 +16,8 @@ DEFAULT_SETTINGS = {
     "music_volume": 0.65,
     "sfx_volume": 0.8,
     "effects": True,
+    "music_enabled": True,
+    "championship_music_enabled": True,
 }
 
 
@@ -40,6 +42,7 @@ class GameSession:
     mode: str = "quick"
     championship_in_progress: bool = False
     championship_index: int = 0
+    championship_laps: int = 2
     championship_points: dict[str, int] = field(default_factory=dict)
     settings: dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_SETTINGS))
     route_plan: dict[str, Any] | None = None
@@ -83,6 +86,8 @@ class GameSession:
                     self.mode = str(stored.get("mode", self.mode))
                     self.championship_in_progress = bool(stored.get("championship_in_progress", False))
                     self.championship_index = int(stored.get("championship_index", 0))
+                    saved_laps = int(stored.get("championship_laps", 2))
+                    self.championship_laps = saved_laps if saved_laps in (1, 2, 3, 5) else 2
                     self.championship_points = {
                         str(key): int(value)
                         for key, value in dict(stored.get("championship_points", {})).items()
@@ -129,6 +134,7 @@ class GameSession:
             "mode": self.mode,
             "championship_in_progress": self.championship_in_progress,
             "championship_index": self.championship_index,
+            "championship_laps": self.championship_laps,
             "championship_points": self.championship_points,
             "selected_algorithm": self.selected_algorithm,
             "route_plan": self.route_plan,
@@ -151,10 +157,11 @@ class GameSession:
         temporary.write_text(json.dumps(payload, indent=2, default=_json_default) + "\n", encoding="utf-8")
         temporary.replace(self.state_path)
 
-    def start_new_championship(self) -> None:
+    def start_new_championship(self, laps: int = 2) -> None:
         self.mode = "championship"
         self.championship_in_progress = True
         self.championship_index = 0
+        self.championship_laps = laps if laps in (1, 2, 3, 5) else 2
         self.championship_points = {"Player": 0, "Navigator": 0, "Shortcut": 0, "Distance": 0}
         self.championship_status = "ACTIVE"
         self.completed_races = []
@@ -218,7 +225,7 @@ class GameSession:
         self.selected_track_id = self.tracks[self.championship_index].id
         self.race_sequence += 1
         config = {
-            "laps": int(self.selected_track.laps),
+            "laps": int(self.championship_laps),
             "ai_difficulty": "Normal",
             "events_enabled": True,
             "routing": "Balanced",

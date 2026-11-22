@@ -15,6 +15,7 @@ def validate_planned_route(
     source_id: int,
     destination_id: int,
     resource_accepted: bool,
+    checkpoint_aware: bool = True,
 ) -> dict[str, Any]:
     """Validate the exact route that will be transferred to the race engine."""
     errors: list[str] = []
@@ -29,14 +30,14 @@ def validate_planned_route(
     path = list(route_result.get("path", []))
     if len(path) < 2:
         errors.append("The planned route must contain at least one road.")
-    if source_id != track.start_id:
+    if checkpoint_aware and source_id != track.start_id:
         errors.append("The route source must be the circuit start vertex.")
-    if destination_id != track.finish_id:
+    if checkpoint_aware and destination_id != track.finish_id:
         errors.append("The route destination must be the circuit finish vertex.")
-    if path and path[0] != track.start_id:
-        errors.append("The planned route does not begin at the official start.")
-    if path and path[-1] != track.finish_id:
-        errors.append("The planned route does not end at the official finish.")
+    if path and path[0] != source_id:
+        errors.append("The planned route does not begin at the selected source.")
+    if path and path[-1] != destination_id:
+        errors.append("The planned route does not end at the selected destination.")
 
     for source, target in zip(path, path[1:]):
         edge = graph.edge_between(source, target)
@@ -46,14 +47,15 @@ def validate_planned_route(
         if edge.status == EdgeStatus.BLOCKED or not edge.traversable():
             errors.append(f"Road E{edge.id} is blocked on the planned route.")
 
-    checkpoint_cursor = 0
-    for vertex_id in path:
-        if checkpoint_cursor < len(track.checkpoint_ids) and vertex_id == track.checkpoint_ids[checkpoint_cursor]:
-            checkpoint_cursor += 1
-    if checkpoint_cursor != len(track.checkpoint_ids):
-        errors.append(
-            f"The route visits {checkpoint_cursor}/{len(track.checkpoint_ids)} mandatory checkpoints in order."
-        )
+    if checkpoint_aware:
+        checkpoint_cursor = 0
+        for vertex_id in path:
+            if checkpoint_cursor < len(track.checkpoint_ids) and vertex_id == track.checkpoint_ids[checkpoint_cursor]:
+                checkpoint_cursor += 1
+        if checkpoint_cursor != len(track.checkpoint_ids):
+            errors.append(
+                f"The route visits {checkpoint_cursor}/{len(track.checkpoint_ids)} mandatory checkpoints in order."
+            )
 
     resources = route_result.get("resources", {}) or {}
     if not resources.get("fuel_feasible", False):

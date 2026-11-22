@@ -71,6 +71,42 @@ def test_game_session_starts_and_continues_championship_in_order(tmp_path):
     assert loaded.selected_track_id == tracks[1].id
 
 
+def test_championship_lap_count_is_selected_and_persisted(tmp_path):
+    tracks = load_tracks()
+    session = GameSession.create(tracks, root=tmp_path)
+    session.start_new_championship(5)
+    config = session.prepare_championship_race()
+    assert config["laps"] == 5
+    loaded = GameSession.create(tracks, root=tmp_path)
+    assert loaded.championship_laps == 5
+
+
+def test_free_exploration_route_allows_arbitrary_endpoints_without_checkpoint_gate():
+    track = load_tracks()[0]
+    planner = RoutePlanner(track, "balanced")
+    source, destination = 11, 5
+    report = planner.plan_route(source, destination, "dijkstra", checkpoint_aware=False)
+    valid = validate_planned_route(
+        track,
+        track.graph(),
+        report,
+        route_revision=2,
+        graph_revision=2,
+        source_id=source,
+        destination_id=destination,
+        resource_accepted=True,
+        checkpoint_aware=False,
+    )
+    assert valid["valid"]
+    assert report["path"][0] == source
+    assert report["path"][-1] == destination
+
+
+def test_settings_default_enables_separate_menu_and_championship_music():
+    assert DEFAULT_SETTINGS["music_enabled"] is True
+    assert DEFAULT_SETTINGS["championship_music_enabled"] is True
+
+
 def test_route_configuration_transfers_from_explorer_to_race_session(tmp_path):
     tracks = load_tracks()
     session = GameSession.create(tracks, root=tmp_path)

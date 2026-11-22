@@ -46,6 +46,8 @@ class Racer:
     fuel_used: float = 0.0
     nitro_uses: int = 0
     planned_route_index: int = 0
+    last_edge_from: int | None = None
+    last_edge_to: int | None = None
 
 
 @dataclass

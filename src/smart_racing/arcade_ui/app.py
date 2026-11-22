@@ -9,6 +9,7 @@ from typing import Callable
 import arcade
 from arcade.gui import UIFlatButton, UIManager, UISlider
 
+from smart_racing.arcade_ui.audio import AudioManager
 from smart_racing.arcade_ui.session import GameSession
 from smart_racing.arcade_ui.theme import (
     AMBER,
@@ -82,6 +83,7 @@ class ArcadeApp(arcade.Window):
             center_window=True,
         )
         self.session = session
+        self.audio = AudioManager(session)
         self.smoke_path = Path(smoke_path) if smoke_path else None
         self.smoke_captured = False
         if initial_screen == "explorer":
@@ -110,8 +112,22 @@ class ArcadeApp(arcade.Window):
             self.show_view(MainMenuView(self, session, self.smoke_path, initial_modal))
 
     def on_close(self):
+        self.audio.stop()
         self.session.close()
         super().on_close()
+
+    def show_view(self, view):
+        super().show_view(view)
+        if not hasattr(self, "audio"):
+            return
+        championship_views = {
+            "ChampionshipDashboardView",
+            "TrackExplorerView",
+            "ArcadeRacingView",
+            "ChampionshipResultsView",
+        }
+        context = "championship" if self.session.mode == "championship" and type(view).__name__ in championship_views else "menu"
+        self.audio.set_context(context)
 
 
 class ArcadeView(arcade.View):
@@ -340,8 +356,12 @@ class MainMenuView(ArcadeView):
         elif self.modal == "settings":
             mode_label = "FULLSCREEN" if self.session.settings["fullscreen"] else "WINDOWED"
             effects_label = "EFFECTS: ON" if self.session.settings["effects"] else "EFFECTS: OFF"
+            music_label = "MUSIC: ON" if self.session.settings.get("music_enabled", True) else "MUSIC: OFF"
+            championship_music_label = "CHAMPIONSHIP THEME: ON" if self.session.settings.get("championship_music_enabled", True) else "CHAMPIONSHIP THEME: OFF"
             self.add_button(mode_label, left + 24, bottom + 100, 190, button_height, self.toggle_fullscreen, NAVY, WHITE, CYAN)
             self.add_button(effects_label, left + 230, bottom + 100, 170, button_height, self.toggle_effects, NAVY, WHITE, CYAN)
+            self.add_button(music_label, left + 24, bottom + 148, 190, button_height, self.toggle_music, NAVY, WHITE, CYAN)
+            self.add_button(championship_music_label, left + 230, bottom + 148, 270, button_height, self.toggle_championship_music, NAVY, WHITE, CYAN)
             self.add_button("SAVE & CLOSE", left + 24, bottom + 28, 170, button_height, self.close_settings, CYAN, NAVY, CYAN)
             slider_width = min(270, panel_width - 80)
             music = UISlider(
@@ -390,9 +410,22 @@ class MainMenuView(ArcadeView):
         self.session.save_settings()
         self.rebuild_ui()
 
+    def toggle_music(self) -> None:
+        self.session.settings["music_enabled"] = not bool(self.session.settings.get("music_enabled", True))
+        self.session.save_settings()
+        self.app.audio.refresh()
+        self.rebuild_ui()
+
+    def toggle_championship_music(self) -> None:
+        self.session.settings["championship_music_enabled"] = not bool(self.session.settings.get("championship_music_enabled", True))
+        self.session.save_settings()
+        self.app.audio.refresh()
+        self.rebuild_ui()
+
     def set_volume(self, key: str, value: float) -> None:
         self.session.settings[key] = round(_clamp(float(value) / 100.0, 0.0, 1.0), 2)
         self.session.save_settings()
+        self.app.audio.refresh()
 
     def close_settings(self) -> None:
         self.session.save_settings()
@@ -493,9 +526,10 @@ class MainMenuView(ArcadeView):
         elif self.modal == "settings":
             _text(f"Window mode: {'Fullscreen' if self.session.settings['fullscreen'] else 'Windowed'}", left + 28, bottom + panel_height - 82, 15, MUTED)
             _text(f"Effects: {'Enabled' if self.session.settings['effects'] else 'Disabled'}", left + 28, bottom + panel_height - 116, 15, MUTED)
-            _text(f"Music volume: {int(self.session.settings['music_volume'] * 100)}%", left + 28, bottom + panel_height - 176, 14, MUTED)
-            _text(f"SFX volume: {int(self.session.settings['sfx_volume'] * 100)}%", left + 28, bottom + panel_height - 226, 14, MUTED)
-            _text("Values persist to JSON and are ready for the audio-backed migration stage.", left + 28, bottom + panel_height - 270, 14, AMBER)
+            _text(f"Background music: {'Enabled' if self.session.settings.get('music_enabled', True) else 'Disabled'}", left + 28, bottom + panel_height - 150, 15, MUTED)
+            _text(f"Championship theme: {'Enabled' if self.session.settings.get('championship_music_enabled', True) else 'Disabled'}", left + 28, bottom + panel_height - 184, 15, MUTED)
+            _text(f"Music volume: {int(self.session.settings['music_volume'] * 100)}%", left + 28, bottom + panel_height - 240, 14, MUTED)
+            _text(f"SFX volume: {int(self.session.settings['sfx_volume'] * 100)}%", left + 28, bottom + panel_height - 290, 14, MUTED)
         else:
             _text("Are you sure you want to exit Smart Racing Championship?", left + 28, bottom + panel_height - 94, 16, MUTED)
 
@@ -857,7 +891,8 @@ class TrackExplorerView(ArcadeView):
         event_y = toggle_y - 44
         self.add_button("ROAD EVENT PREVIEW", left + 12, event_y, width - 24, 32, self.open_event_modal, NAVY, WHITE, CORAL)
         start_y = bottom + 12
-        self.add_button("REVIEW / START RACE", left + 12, start_y, width - 24, 40, self.start_race, EMERALD, NAVY, EMERALD)
+        start_label = "START FREE ROUTE" if self.explorer_mode == "free" else "REVIEW / START RACE"
+        self.add_button(start_label, left + 12, start_y, width - 24, 40, self.start_race, EMERALD, NAVY, EMERALD)
         self.base_button_count = len(self.buttons)
         modal_height = min(430, int(self.window.height * 0.60))
         modal_bottom = max(170, (self.window.height - modal_height) / 2)
@@ -1247,11 +1282,7 @@ class TrackExplorerView(ArcadeView):
             self.status_message = "Race blocked: circuit validation failed."
             self.status_color = CORAL
             return
-        if self.explorer_mode != "full_race":
-            self.status_message = "Race blocked: switch to Full Race Plan; free exploration is not a race plan."
-            self.status_color = CORAL
-            return
-        if self.source_id != self.track.start_id:
+        if self.explorer_mode == "full_race" and self.source_id != self.track.start_id:
             self.status_message = "Race blocked: source must be the circuit start vertex."
             self.status_color = CORAL
             return
@@ -1306,6 +1337,7 @@ class TrackExplorerView(ArcadeView):
                 "required_refuelling_stops": resources.get("required_refuelling_stops", []),
                 "resources": resources,
                 "resource_accepted": True,
+                "race_laps": int(self.session.quick_race_config.get("laps", self.track.laps)) if self.explorer_mode == "full_race" else 1,
             }
         )
         self.modal = None
@@ -1322,6 +1354,7 @@ class TrackExplorerView(ArcadeView):
             source_id=self.source_id,
             destination_id=self.destination_id,
             resource_accepted=self.resource_accepted if require_resource_acceptance else True,
+            checkpoint_aware=self.checkpoint_aware,
         )
 
     def toggle_closure(self) -> None:
@@ -1966,7 +1999,7 @@ class TrackExplorerView(ArcadeView):
             (f"Geometry: {'valid' if self.geometry and self.geometry.valid else 'invalid'} / {len(self.geometry.warnings) if self.geometry else 0} warnings", EMERALD if self.geometry and self.geometry.valid else CORAL, False),
             ("ROUTE VALIDATION", WHITE, True),
             (f"Mode: {'FULL RACE PLAN' if self.explorer_mode == 'full_race' else 'FREE EXPLORATION'}", CYAN, False),
-            (f"Source: {self.source_id}   Destination: {self.destination_id}", WHITE, False),
+            ("Start/finish: shared timing line" if self.explorer_mode == "full_race" else f"Source: {self.source_id}   Destination: {self.destination_id}", WHITE, False),
             (f"Route status: {self.route_state.replace('_', ' ')}", self.status_color, False),
             (self.status_message, self.status_color, False),
         ]

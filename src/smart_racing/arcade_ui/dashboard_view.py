@@ -27,6 +27,7 @@ class ChampionshipDashboardView(ArcadeView):
         self.entries: list[ChampionshipEntry] = []
         self.status = "Championship not started. Start a season to create persistent standings."
         self.confirm_reset = False
+        self.laps = int(getattr(session, "championship_laps", 2))
         super().__init__(window, session)
         self.load_entries()
 
@@ -58,6 +59,7 @@ class ChampionshipDashboardView(ArcadeView):
         self.add_button(start_label, 24, 42, 220, 38, self.start_championship if not self.session.championship_in_progress else self.next_race, EMERALD, NAVY, EMERALD)
         self.add_button("NEXT ROUND", 256, 42, 140, 38, self.next_race, CYAN, NAVY, CYAN)
         self.add_button("RESET", 406, 42, 100, 38, self.request_reset, (84, 27, 39) if self.confirm_reset else NAVY, WHITE, CORAL)
+        self.add_button(f"LAPS  {self.laps}", 518, 42, 112, 38, self.cycle_laps, NAVY, WHITE, CYAN)
 
     def go_menu(self) -> None:
         from smart_racing.arcade_ui.app import MainMenuView
@@ -74,8 +76,20 @@ class ChampionshipDashboardView(ArcadeView):
         self.status = f"Top-{count} view selected using the same ranking comparator."
         self.rebuild_ui()
 
+    def cycle_laps(self) -> None:
+        if self.session.championship_in_progress and self.session.championship_status not in {"NOT_STARTED", "COMPLETED"}:
+            self.status = "Lap count is locked while a championship is in progress. Start a new season to change it."
+            self.rebuild_ui()
+            return
+        choices = (1, 2, 3, 5)
+        self.laps = choices[(choices.index(self.laps) + 1) % len(choices)]
+        self.session.championship_laps = self.laps
+        self.session.save_state()
+        self.status = f"Championship length set to {self.laps} lap(s) per circuit."
+        self.rebuild_ui()
+
     def start_championship(self) -> None:
-        self.session.start_new_championship()
+        self.session.start_new_championship(self.laps)
         self.entries = [ChampionshipEntry(**value) for value in self.session.championship_entries.values()]
         self.status = "New championship created. Round 1 is ready to launch."
         self.confirm_reset = False
@@ -133,10 +147,12 @@ class ChampionshipDashboardView(ArcadeView):
         self.draw_panel(width * 0.41, bottom, width * 0.56, height - 210, 246)
         _text("PODIUM", left + 22, height - 148, 18, WHITE, bold=True)
         if ranked:
-            podium_x = [left + 80, left + 190, left + 300]
-            podium_y = [height - 390, height - 330, height - 270]
-            colors = [AMBER, (180, 194, 210), (180, 122, 67)]
-            for index, entry in enumerate(ranked[:3]):
+            podium_x = [left + 55, left + 145, left + 235, left + 325]
+            # The first-place column is intentionally tallest; each later
+            # position is shorter while all four share the same baseline.
+            podium_y = [height - 270, height - 330, height - 390, height - 450]
+            colors = [AMBER, (180, 194, 210), (180, 122, 67), PURPLE]
+            for index, entry in enumerate(ranked[:self.top_k]):
                 x = podium_x[index]
                 y = podium_y[index]
                 arcade.draw_lbwh_rectangle_filled(x - 42, bottom + 90, 84, y - bottom - 90, (*colors[index], 150))

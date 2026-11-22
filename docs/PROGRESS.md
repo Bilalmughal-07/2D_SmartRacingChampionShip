@@ -98,6 +98,16 @@ Status: `COMPLETE` for the expanded gameplay/UI and release gates in the current
 2. Fill actual group member names and registration numbers on the report title page.
 3. Review and merge the stacked GitHub PRs in order if desired: core, Arcade, then QA/release.
 
+## Free exploration, AI policies, and championship lap configuration (2026-11-22)
+
+- Added two explicit route modes. Free Exploration accepts an arbitrary source and destination, computes the selected algorithm/strategy/resource plan, and launches a one-lap race on that exact route. Full Race Plan keeps one colocated physical start/finish timing line, requires all ten checkpoints in order, and uses the configured lap count.
+- Added a persistent Championship Dashboard lap selector for 1/2/3/5 laps. The selected value is asked before a new season, applied to every round, persisted in the session file, and locked while an active season is in progress.
+- Completed the four-racer policy split on the shared fixed-step engine: Navigator follows its deterministic main route/detour policy, Shortcut prefers legal shortcuts without immediate U-turn oscillation, Distance recomputes shortest-distance legal paths, and Player follows the transferred Explorer route until a confirmed A/D alternative or live event reroute.
+- Added runtime route recovery for blocked planned roads, relative left/right exit selection, live planned-blue versus reroute-white route state, deterministic seeded road events, shared fuel/nitro/checkpoint rules, and resource-aware AI detours.
+- Added optional procedural menu and championship themes controlled by separate Settings toggles and music volume; audio failures remain non-fatal in headless smoke runs.
+- Verified actual 1280×720 Arcade settings, dashboard, Explorer, and Racing frames after the layout fix. The settings labels and volume rows no longer overlap the controls.
+- Verification after this phase: 62 tests passed, Ruff passed, compile checks passed, all three circuits completed with four finishers with and without seeded events, `run_validation.py` passed, and free-route one-lap launch plus blocked-route recovery were covered by regression tests.
+
 ## External inputs still required
 
 - Actual registration numbers, section, and group names.
