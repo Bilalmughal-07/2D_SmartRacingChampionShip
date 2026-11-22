@@ -405,9 +405,22 @@ class RaceEngine:
     def _ordered_player_exits(self, racer: Racer, vertex_id: int | None = None) -> list[int]:
         vertex_id = racer.current_vertex if vertex_id is None else vertex_id
         hx, hy = self._player_heading(racer)
+        incoming_vertex = racer.last_edge_from
+        if (
+            incoming_vertex is None
+            and racer.current_path
+            and racer.current_edge_index + 1 < len(racer.current_path)
+            and vertex_id == racer.current_path[racer.current_edge_index + 1]
+        ):
+            incoming_vertex = racer.current_path[racer.current_edge_index]
         options = []
         for target, edge in self.graph.neighbors(vertex_id):
             if not edge.traversable():
+                continue
+            # The road the car just arrived on is not a left/right choice. It
+            # is the incoming lane, so excluding it prevents A/D + Enter from
+            # sending the player into an unintended reverse movement.
+            if incoming_vertex is not None and target == incoming_vertex:
                 continue
             vertex = self.graph.vertices[target]
             dx, dy = vertex.x - self.graph.vertices[vertex_id].x, vertex.y - self.graph.vertices[vertex_id].y

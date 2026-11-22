@@ -308,16 +308,9 @@ class ArcadeRacingView(ArcadeView):
         for vertex in self.engine.graph.vertices.values():
             x, y = self.world_to_screen(vertex.x, vertex.y)
             arcade.draw_circle_filled(x, y, 16, (47, 57, 68))
-        if self.show_route:
-            original = self.engine.original_player_route
-            live = self.engine.player_route if self.engine.player_deviated else original
-            original_edges = set(zip(original, original[1:]))
-            self._draw_route_lines(original, CYAN, 8, 29)
-            if self.engine.player_deviated:
-                for source_id, target_id in zip(live, live[1:]):
-                    if (source_id, target_id) in original_edges:
-                        continue
-                    self._draw_route_lines([source_id, target_id], WHITE, 7, 27)
+        # Route guidance belongs on the minimap.  The large race surface stays
+        # an uncluttered asphalt view so the player can read intersections,
+        # event markings, and car positions without a second route drawing.
         for vertex in self.engine.graph.vertices.values():
             self._draw_vertex(vertex)
         for racer in self.engine.racers:
@@ -438,20 +431,21 @@ class ArcadeRacingView(ArcadeView):
             a = self.engine.graph.vertices[edge.from_id]
             b = self.engine.graph.vertices[edge.to_id]
             arcade.draw_line(*point(a.x, a.y), *point(b.x, b.y), CORAL if edge.status == EdgeStatus.BLOCKED else (77, 94, 113), 2)
-        original = self.engine.original_player_route
-        live = self.engine.player_route if self.engine.player_deviated else original
-        original_edges = set(zip(original, original[1:]))
-        for source_id, target_id in zip(original, original[1:]):
-            source, target = self.engine.graph.vertices.get(source_id), self.engine.graph.vertices.get(target_id)
-            if source and target:
-                arcade.draw_line(*point(source.x, source.y), *point(target.x, target.y), CYAN, 4)
-        if self.engine.player_deviated:
-            for source_id, target_id in zip(live, live[1:]):
-                if (source_id, target_id) in original_edges:
-                    continue
+        if self.show_route:
+            original = self.engine.original_player_route
+            live = self.engine.player_route if self.engine.player_deviated else original
+            original_edges = set(zip(original, original[1:]))
+            for source_id, target_id in zip(original, original[1:]):
                 source, target = self.engine.graph.vertices.get(source_id), self.engine.graph.vertices.get(target_id)
                 if source and target:
-                    arcade.draw_line(*point(source.x, source.y), *point(target.x, target.y), WHITE, 3)
+                    arcade.draw_line(*point(source.x, source.y), *point(target.x, target.y), CYAN, 4)
+            if self.engine.player_deviated:
+                for source_id, target_id in zip(live, live[1:]):
+                    if (source_id, target_id) in original_edges:
+                        continue
+                    source, target = self.engine.graph.vertices.get(source_id), self.engine.graph.vertices.get(target_id)
+                    if source and target:
+                        arcade.draw_line(*point(source.x, source.y), *point(target.x, target.y), WHITE, 3)
         for racer in self.engine.racers:
             px, py = point(*self._racer_position(racer))
             color = {1: CYAN, 2: CORAL, 3: EMERALD, 4: PURPLE}.get(racer.id, WHITE)

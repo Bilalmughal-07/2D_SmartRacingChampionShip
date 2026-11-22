@@ -154,6 +154,7 @@ def test_player_exit_selection_survives_arrival_at_next_junction_on_all_circuits
         engine.tick()
         player = engine._player()
         decision_vertex = player.current_path[1]
+        assert player.current_vertex not in engine.available_player_exits()
         planned_next = planned[2]
         selected = None
         for _ in range(len(engine.available_player_exits()) + 2):
