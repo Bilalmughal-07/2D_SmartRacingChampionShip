@@ -144,7 +144,7 @@
     {
       "id": 15,
       "x": 100.0,
-      "y": 430.0,
+      "y": 600.0,
       "type": "Finish",
       "checkpoint_order": null,
       "active": true

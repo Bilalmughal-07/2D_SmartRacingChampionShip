@@ -111,8 +111,8 @@
     },
     {
       "id": 11,
-      "x": 240.0,
-      "y": 120.0,
+      "x": 400.0,
+      "y": 90.0,
       "type": "Finish",
       "checkpoint_order": null,
       "active": true
@@ -192,7 +192,7 @@
     {
       "id": 21,
       "x": 255.0,
-      "y": 350.0,
+      "y": 430.0,
       "type": "Intersection",
       "checkpoint_order": null,
       "active": true

@@ -42,7 +42,13 @@ class Racer:
     sprint_remaining: float = 0.0
     sprint_cooldown: float = 0.0
     selected_exit: int | None = None
+    selected_exit_vertex: int | None = None
     exit_confirmed: bool = False
+    fuel_used: float = 0.0
+    nitro_uses: int = 0
+    planned_route_index: int = 0
+    last_edge_from: int | None = None
+    last_edge_to: int | None = None
 
 
 @dataclass
@@ -55,6 +61,12 @@ class RaceResult:
     bonus_points: int = 0
     points_awarded: int = 0
     dnf: bool = False
+    fuel_used: float = 0.0
+    nitro_used: int = 0
+    completed_checkpoints: int = 0
+    event_count: int = 0
+    mode: str = ""
+    round_index: int | None = None
 
 
 @dataclass

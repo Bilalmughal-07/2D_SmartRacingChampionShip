@@ -1,0 +1,298 @@
+{
+  "races": [
+    {
+      "track": "circuit_01",
+      "results": [
+        {
+          "race_id": "circuit_01",
+          "racer_id": 1,
+          "finish_position": 1,
+          "finish_time": 49.28333333333182,
+          "fastest_lap": 21.30000000000007,
+          "bonus_points": 0,
+          "points_awarded": 25,
+          "dnf": false,
+          "fuel_used": 21.744,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 6,
+          "mode": "",
+          "round_index": null
+        },
+        {
+          "race_id": "circuit_01",
+          "racer_id": 2,
+          "finish_position": 2,
+          "finish_time": 51.749999999998344,
+          "fastest_lap": 18.750000000000217,
+          "bonus_points": 0,
+          "points_awarded": 18,
+          "dnf": false,
+          "fuel_used": 29.606,
+          "nitro_used": 5,
+          "completed_checkpoints": 30,
+          "event_count": 6,
+          "mode": "",
+          "round_index": null
+        },
+        {
+          "race_id": "circuit_01",
+          "racer_id": 3,
+          "finish_position": 3,
+          "finish_time": 57.41666666666469,
+          "fastest_lap": 23.166666666666632,
+          "bonus_points": 0,
+          "points_awarded": 15,
+          "dnf": false,
+          "fuel_used": 28.656,
+          "nitro_used": 3,
+          "completed_checkpoints": 30,
+          "event_count": 6,
+          "mode": "",
+          "round_index": null
+        },
+        {
+          "race_id": "circuit_01",
+          "racer_id": 4,
+          "finish_position": 4,
+          "finish_time": 58.99999999999793,
+          "fastest_lap": 25.499999999999833,
+          "bonus_points": 0,
+          "points_awarded": 12,
+          "dnf": false,
+          "fuel_used": 21.692,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 6,
+          "mode": "",
+          "round_index": null
+        }
+      ],
+      "events": [
+        "t=12.0: road_blockage target=22",
+        "t=24.0: road_reopen target=22",
+        "t=25.0: shortcut_toggle target=4",
+        "t=43.0: oil_spill target=28",
+        "t=45.0: shortcut_toggle target=4",
+        "t=55.0: speed_restriction target=27"
+      ]
+    },
+    {
+      "track": "circuit_02",
+      "results": [
+        {
+          "race_id": "circuit_02",
+          "racer_id": 1,
+          "finish_position": 1,
+          "finish_time": 67.26666666666414,
+          "fastest_lap": 32.79999999999814,
+          "bonus_points": 0,
+          "points_awarded": 25,
+          "dnf": false,
+          "fuel_used": 32.52,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
+        },
+        {
+          "race_id": "circuit_02",
+          "racer_id": 2,
+          "finish_position": 2,
+          "finish_time": 71.24999999999724,
+          "fastest_lap": 32.33333333333278,
+          "bonus_points": 0,
+          "points_awarded": 18,
+          "dnf": false,
+          "fuel_used": 39.957,
+          "nitro_used": 5,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
+        },
+        {
+          "race_id": "circuit_02",
+          "racer_id": 4,
+          "finish_position": 3,
+          "finish_time": 77.49999999999689,
+          "fastest_lap": 38.749999999997804,
+          "bonus_points": 0,
+          "points_awarded": 15,
+          "dnf": false,
+          "fuel_used": 30.933,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
+        },
+        {
+          "race_id": "circuit_02",
+          "racer_id": 3,
+          "finish_position": 4,
+          "finish_time": 78.74999999999682,
+          "fastest_lap": 36.99999999999918,
+          "bonus_points": 0,
+          "points_awarded": 12,
+          "dnf": false,
+          "fuel_used": 40.832,
+          "nitro_used": 3,
+          "completed_checkpoints": 30,
+          "event_count": 8,
+          "mode": "",
+          "round_index": null
+        }
+      ],
+      "events": [
+        "t=12.0: road_blockage target=38",
+        "t=24.0: road_reopen target=38",
+        "t=25.0: shortcut_toggle target=28",
+        "t=41.0: oil_spill target=0",
+        "t=45.0: shortcut_toggle target=28",
+        "t=61.0: effect_expire target=0",
+        "t=61.0: speed_restriction target=2",
+        "t=76.0: effect_expire target=2"
+      ]
+    },
+    {
+      "track": "circuit_03",
+      "results": [
+        {
+          "race_id": "circuit_03",
+          "racer_id": 1,
+          "finish_position": 1,
+          "finish_time": 56.66666666666473,
+          "fastest_lap": 28.333333333331726,
+          "bonus_points": 0,
+          "points_awarded": 25,
+          "dnf": false,
+          "fuel_used": 24.2,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 7,
+          "mode": "",
+          "round_index": null
+        },
+        {
+          "race_id": "circuit_03",
+          "racer_id": 2,
+          "finish_position": 2,
+          "finish_time": 63.99999999999765,
+          "fastest_lap": 29.999999999999577,
+          "bonus_points": 0,
+          "points_awarded": 18,
+          "dnf": false,
+          "fuel_used": 28.303,
+          "nitro_used": 3,
+          "completed_checkpoints": 30,
+          "event_count": 7,
+          "mode": "",
+          "round_index": null
+        },
+        {
+          "race_id": "circuit_03",
+          "racer_id": 3,
+          "finish_position": 3,
+          "finish_time": 65.74999999999756,
+          "fastest_lap": 30.249999999999563,
+          "bonus_points": 0,
+          "points_awarded": 15,
+          "dnf": false,
+          "fuel_used": 32.331,
+          "nitro_used": 4,
+          "completed_checkpoints": 30,
+          "event_count": 7,
+          "mode": "",
+          "round_index": null
+        },
+        {
+          "race_id": "circuit_03",
+          "racer_id": 4,
+          "finish_position": 4,
+          "finish_time": 67.99999999999743,
+          "fastest_lap": 33.999999999998074,
+          "bonus_points": 0,
+          "points_awarded": 12,
+          "dnf": false,
+          "fuel_used": 24.2,
+          "nitro_used": 0,
+          "completed_checkpoints": 30,
+          "event_count": 7,
+          "mode": "",
+          "round_index": null
+        }
+      ],
+      "events": [
+        "t=12.0: road_blockage target=22",
+        "t=24.0: road_reopen target=22",
+        "t=27.0: shortcut_toggle target=8",
+        "t=41.0: oil_spill target=32",
+        "t=47.0: shortcut_toggle target=8",
+        "t=60.0: speed_restriction target=21",
+        "t=61.0: effect_expire target=32"
+      ]
+    }
+  ],
+  "standings": [
+    {
+      "racer_id": 1,
+      "name": "Player",
+      "total_points": 75,
+      "wins": 3,
+      "sum_of_finish_positions": 3,
+      "best_fastest_lap": 21.30000000000007
+    },
+    {
+      "racer_id": 2,
+      "name": "Navigator",
+      "total_points": 54,
+      "wins": 0,
+      "sum_of_finish_positions": 6,
+      "best_fastest_lap": 18.750000000000217
+    },
+    {
+      "racer_id": 3,
+      "name": "Shortcut",
+      "total_points": 42,
+      "wins": 0,
+      "sum_of_finish_positions": 10,
+      "best_fastest_lap": 23.166666666666632
+    },
+    {
+      "racer_id": 4,
+      "name": "Distance",
+      "total_points": 39,
+      "wins": 0,
+      "sum_of_finish_positions": 11,
+      "best_fastest_lap": 25.499999999999833
+    }
+  ],
+  "top_3": [
+    {
+      "racer_id": 1,
+      "name": "Player",
+      "total_points": 75,
+      "wins": 3,
+      "sum_of_finish_positions": 3,
+      "best_fastest_lap": 21.30000000000007
+    },
+    {
+      "racer_id": 2,
+      "name": "Navigator",
+      "total_points": 54,
+      "wins": 0,
+      "sum_of_finish_positions": 6,
+      "best_fastest_lap": 18.750000000000217
+    },
+    {
+      "racer_id": 3,
+      "name": "Shortcut",
+      "total_points": 42,
+      "wins": 0,
+      "sum_of_finish_positions": 10,
+      "best_fastest_lap": 23.166666666666632
+    }
+  ]
+}
